@@ -1,0 +1,78 @@
+{
+  "id": "mosh-wos-items",
+  "title": "Mothership: Wages of Sin",
+  "description": "Compendium content for the Mothership RPG Wages of Sin expansion, including the Bounty Hunter class, custom skills, weapons, armor, equipment, patches, and trinkets.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "11",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "FTT Campaign"
+    }
+  ],
+  "packs": [
+    {
+      "label": "Bounty Hunter Class (WoS)",
+      "type": "Item",
+      "name": "wos_classes",
+      "path": "packs/wos_classes.db"
+    },
+    {
+      "label": "Skills (WoS)",
+      "type": "Item",
+      "name": "wos_skills",
+      "path": "packs/wos_skills.db"
+    },
+    {
+      "label": "Weapons (WoS)",
+      "type": "Item",
+      "name": "wos_weapons",
+      "path": "packs/wos_weapons.db"
+    },
+    {
+      "label": "Armor (WoS)",
+      "type": "Item",
+      "name": "wos_armor",
+      "path": "packs/wos_armor.db"
+    },
+    {
+      "label": "Equipment (WoS)",
+      "type": "Item",
+      "name": "wos_equipment",
+      "path": "packs/wos_equipment.db"
+    },
+    {
+      "label": "Patches (WoS)",
+      "type": "Item",
+      "name": "wos_patches",
+      "path": "packs/wos_patches.db"
+    },
+    {
+      "label": "Trinkets (WoS)",
+      "type": "Item",
+      "name": "wos_trinkets",
+      "path": "packs/wos_trinkets.db"
+    },
+    {
+      "label": "Roll Tables (WoS)",
+      "type": "RollTable",
+      "name": "wos_rolltables",
+      "path": "packs/wos_rolltables.db"
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "mosh",
+        "type": "system",
+        "manifest": "https://raw.githubusercontent.com/Futil/foundry-mothership/master/system.json",
+        "compatibility": {
+          "minimum": "0.5.25",
+          "verified": "0.6.1"
+        }
+      }
+    ]
+  }
+}
