@@ -32,7 +32,7 @@ Content in this module is primarily sourced from the official *Mothership: Wages
 
 | Pack | Contents |
 |------|----------|
-| Bounty Hunter Class (WoS) | The Bounty Hunter class |
+| Wages of Sin Classes (WoS) | The Bounty Hunter class |
 | Skills (WoS) | Custom WoS skills |
 | Weapons (WoS) | WoS weapons |
 | Armor (WoS) | WoS armor & suits |
