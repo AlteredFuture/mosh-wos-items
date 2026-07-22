@@ -4,3 +4,10 @@ packs/*/
 # Ignore local agent file
 agent.md
 
+# Ignore Node.js test infrastructure (local dev only)
+node_modules/
+package.json
+package-lock.json
+tests/
+tests/screenshots/
+
