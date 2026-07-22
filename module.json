@@ -2,7 +2,7 @@
   "id": "mosh-wos-items",
   "title": "Mothership: Wages of Sin",
   "description": "Compendium content for the Mothership RPG Wages of Sin expansion, including the Bounty Hunter class, custom skills, weapons, armor, equipment, patches, and trinkets.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "manifest": "https://raw.githubusercontent.com/AlteredFuture/mosh-wos-items/main/module.json",
   "download": "https://github.com/AlteredFuture/mosh-wos-items/archive/refs/heads/main.zip",
   "compatibility": {

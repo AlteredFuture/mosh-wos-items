@@ -1,2 +1,6 @@
 # Ignore generated LevelDB folders inside packs/
 packs/*/
+
+# Ignore local agent file
+agent.md
+
