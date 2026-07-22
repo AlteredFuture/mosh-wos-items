@@ -1,0 +1,8 @@
+2026/07/21-19:39:13.495 accc Recovering log #4
+2026/07/21-19:39:13.548 accc Delete type=0 #4
+2026/07/21-19:39:13.548 accc Delete type=3 #2
+2026/07/21-19:58:20.269 3a6c Level-0 table #9: started
+2026/07/21-19:58:20.269 3a6c Level-0 table #9: 0 bytes OK
+2026/07/21-19:58:20.293 3a6c Delete type=0 #7
+2026/07/21-19:58:20.329 3a6c Manual compaction at level-0 from '!items!WoSWeaponCrossbow1' @ 72057594037927935 : 1 .. '!items!WoSWeaponWristBld1' @ 0 : 0; will stop at (end)
+2026/07/21-19:58:20.329 3a6c Manual compaction at level-1 from '!items!WoSWeaponCrossbow1' @ 72057594037927935 : 1 .. '!items!WoSWeaponWristBld1' @ 0 : 0; will stop at (end)

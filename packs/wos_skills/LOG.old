@@ -1,0 +1,8 @@
+2026/07/21-19:39:13.461 b938 Recovering log #4
+2026/07/21-19:39:13.492 b938 Delete type=0 #4
+2026/07/21-19:39:13.492 b938 Delete type=3 #2
+2026/07/21-19:58:20.242 3a6c Level-0 table #9: started
+2026/07/21-19:58:20.242 3a6c Level-0 table #9: 0 bytes OK
+2026/07/21-19:58:20.253 3a6c Delete type=0 #7
+2026/07/21-19:58:20.264 3a6c Manual compaction at level-0 from '!items!WoSSkillInterrog01' @ 72057594037927935 : 1 .. '!items!WoSSkillTracking01' @ 0 : 0; will stop at (end)
+2026/07/21-19:58:20.264 3a6c Manual compaction at level-1 from '!items!WoSSkillInterrog01' @ 72057594037927935 : 1 .. '!items!WoSSkillTracking01' @ 0 : 0; will stop at (end)

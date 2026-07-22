@@ -1,0 +1,8 @@
+2026/07/21-19:39:13.612 366c Recovering log #4
+2026/07/21-19:39:13.687 366c Delete type=0 #4
+2026/07/21-19:39:13.687 366c Delete type=3 #2
+2026/07/21-19:58:20.305 3a6c Level-0 table #9: started
+2026/07/21-19:58:20.305 3a6c Level-0 table #9: 0 bytes OK
+2026/07/21-19:58:20.316 3a6c Delete type=0 #7
+2026/07/21-19:58:20.329 3a6c Manual compaction at level-0 from '!items!WoSEquipAntiPirID' @ 72057594037927935 : 1 .. '!items!WoSEquipXRayCav01' @ 0 : 0; will stop at (end)
+2026/07/21-19:58:20.329 3a6c Manual compaction at level-1 from '!items!WoSEquipAntiPirID' @ 72057594037927935 : 1 .. '!items!WoSEquipXRayCav01' @ 0 : 0; will stop at (end)
