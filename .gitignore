@@ -1,0 +1,2 @@
+# Ignore generated LevelDB folders inside packs/
+packs/*/
