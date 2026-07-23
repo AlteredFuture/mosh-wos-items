@@ -2,16 +2,21 @@
   "id": "mosh-wos-items",
   "title": "Mothership: Wages of Sin",
   "description": "Compendium content for the Mothership RPG Wages of Sin expansion, including the Bounty Hunter class, custom skills, weapons, armor, equipment, patches, and trinkets.",
-  "version": "0.5.2",
+  "version": "0.6.1",
+  "url": "https://github.com/AlteredFuture/mosh-wos-items",
   "manifest": "https://raw.githubusercontent.com/AlteredFuture/mosh-wos-items/main/module.json",
   "download": "https://github.com/AlteredFuture/mosh-wos-items/archive/refs/heads/main.zip",
+  "readme": "https://github.com/AlteredFuture/mosh-wos-items/blob/main/README.md",
+  "bugs": "https://github.com/AlteredFuture/mosh-wos-items/issues",
+  "changelog": "https://github.com/AlteredFuture/mosh-wos-items/blob/main/README.md",
   "compatibility": {
     "minimum": "11",
     "verified": "14"
   },
   "authors": [
     {
-      "name": "FTT Campaign"
+      "name": "FTT Campaign",
+      "url": "https://github.com/AlteredFuture"
     }
   ],
   "packs": [
