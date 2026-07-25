@@ -393,6 +393,7 @@ function renderBountyHTML(data = {}) {
   const isUnknown = Boolean(data.isUnknown) || (data.target || "").toUpperCase().includes("UNKNOWN TARGET") || (data.target || "").toUpperCase().includes("UNIDENTIFIED");
   const rawTarget = isUnknown ? (data.target || "UNKNOWN TARGET") : (data.target || "Unknown Target");
   const targetUuid = data.targetUuid || "";
+  const status = (data.status || "open").toLowerCase();
   
   let targetDisplay = rawTarget;
   if (!isUnknown && targetUuid && !rawTarget.includes("@UUID")) {
@@ -423,8 +424,8 @@ function renderBountyHTML(data = {}) {
     `<span class="wos-circle-option ${lvl === bountyLevel ? 'wos-active' : ''}" data-bl="${lvl}">${lvl}</span>`
   ).join(" ");
 
-  const wantedHTML = ["Dead", "Alive", "Dead or Alive"].map(status =>
-    `<span class="wos-circle-option ${status === wantedStatus ? 'wos-active' : ''}">${status}</span>`
+  const wantedHTML = ["Dead", "Alive", "Dead or Alive"].map(st =>
+    `<span class="wos-circle-option ${st === wantedStatus ? 'wos-active' : ''}">${st}</span>`
   ).join(" ");
 
   let imgContent = "";
@@ -453,8 +454,12 @@ function renderBountyHTML(data = {}) {
     ? `<div><strong>Footnotes:</strong> ${footnotes}</div>`
     : `<div></div>`;
 
+  const stampOverlayHTML = (status === "completed" || status === "closed")
+    ? `<div class="wos-bounty-stamp-overlay wos-stamp-${status}"><span>${status === "completed" ? "COMPLETED" : "CLOSED"}</span></div>`
+    : "";
+
   return `
-<div class="wos-bounty-container wos-bl-${bountyLevel} ${isUnknown ? 'wos-is-unknown' : ''}" data-bounty-data="${encodeURIComponent(JSON.stringify(data))}">
+<div class="wos-bounty-container wos-bl-${bountyLevel} wos-status-${status} ${isUnknown ? 'wos-is-unknown' : ''}" data-bounty-data="${encodeURIComponent(JSON.stringify(data))}">
   <div class="wos-bounty-header">
     <div class="wos-bounty-header-left">
       <div class="wos-bounty-badge">${isUnknown ? 'UNKNOWN BOUNTY' : 'BOUNTY'}</div>
@@ -502,6 +507,7 @@ function renderBountyHTML(data = {}) {
     <!-- Right Column -->
     <div class="wos-bounty-right-col">
       <div class="wos-bounty-poster-box">
+        ${stampOverlayHTML}
         <div class="wos-bounty-wanted-banner">W A N T E D . ${wantedStatus.toUpperCase()}</div>
         <div class="wos-bounty-portrait-frame">
           ${imgContent}
@@ -538,6 +544,7 @@ function renderPlayerBountyHTML(data = {}) {
   const isUnknown = Boolean(data.isUnknown) || (data.target || "").toUpperCase().includes("UNKNOWN TARGET") || (data.target || "").toUpperCase().includes("UNIDENTIFIED");
   const rawTarget = isUnknown ? (data.target || "UNKNOWN TARGET") : (data.target || "Unknown Target");
   const targetUuid = data.targetUuid || "";
+  const status = (data.status || "open").toLowerCase();
   
   let targetDisplay = rawTarget;
   if (!isUnknown && targetUuid && !rawTarget.includes("@UUID")) {
@@ -565,8 +572,8 @@ function renderPlayerBountyHTML(data = {}) {
     `<span class="wos-circle-option ${lvl === bountyLevel ? 'wos-active' : ''}">${lvl}</span>`
   ).join(" ");
 
-  const wantedHTML = ["Dead", "Alive", "Dead or Alive"].map(status =>
-    `<span class="wos-circle-option ${status === wantedStatus ? 'wos-active' : ''}">${status}</span>`
+  const wantedHTML = ["Dead", "Alive", "Dead or Alive"].map(st =>
+    `<span class="wos-circle-option ${st === wantedStatus ? 'wos-active' : ''}">${st}</span>`
   ).join(" ");
 
   let imgContent = "";
@@ -588,8 +595,12 @@ function renderPlayerBountyHTML(data = {}) {
     ? `<div><strong>Footnotes:</strong> ${footnotes}</div>`
     : `<div></div>`;
 
+  const stampOverlayHTML = (status === "completed" || status === "closed")
+    ? `<div class="wos-bounty-stamp-overlay wos-stamp-${status}"><span>${status === "completed" ? "COMPLETED" : "CLOSED"}</span></div>`
+    : "";
+
   return `
-<div class="wos-bounty-container wos-bl-${bountyLevel} ${isUnknown ? 'wos-is-unknown' : ''}">
+<div class="wos-bounty-container wos-bl-${bountyLevel} wos-status-${status} ${isUnknown ? 'wos-is-unknown' : ''}">
   <div class="wos-bounty-header">
     <div class="wos-bounty-header-left">
       <div class="wos-bounty-badge">${isUnknown ? 'UNKNOWN BOUNTY' : 'PUBLIC BOUNTY'}</div>
@@ -625,6 +636,7 @@ function renderPlayerBountyHTML(data = {}) {
     <!-- Right Column: Poster, Target Stats, Locations -->
     <div class="wos-bounty-right-col">
       <div class="wos-bounty-poster-box">
+        ${stampOverlayHTML}
         <div class="wos-bounty-wanted-banner">W A N T E D . ${wantedStatus.toUpperCase()}</div>
         <div class="wos-bounty-portrait-frame">
           ${imgContent}
@@ -727,6 +739,7 @@ function extractBountyDataFromJournal(journal) {
   // 2. DOM Parser fallback for legacy or manually authored journal entries
   let cleanName = journal.name.replace(/^(bounty|wanted|target)[\s\:\-\_]*/i, "").trim() || journal.name;
   let isUnknown = false;
+  let status = "open";
   let img = "";
   let bountyLevel = 1;
   let crime = "Unspecified Offense";
@@ -755,6 +768,8 @@ function extractBountyDataFromJournal(journal) {
         const blMatch = container.className.match(/wos-bl-(\d+)/);
         if (blMatch) bountyLevel = parseInt(blMatch[1]);
         if (container.classList.contains("wos-is-unknown")) isUnknown = true;
+        if (container.classList.contains("wos-status-completed") || doc.querySelector(".wos-stamp-completed")) status = "completed";
+        else if (container.classList.contains("wos-status-closed") || doc.querySelector(".wos-stamp-closed")) status = "closed";
       }
 
       const titleEl = doc.querySelector(".wos-bounty-title");
@@ -838,6 +853,7 @@ function extractBountyDataFromJournal(journal) {
   return {
     target: cleanName,
     isUnknown: isUnknown,
+    status: status,
     img: img,
     bountyLevel: bountyLevel,
     crime: crime,
@@ -884,10 +900,10 @@ async function createBountyBoard() {
       return "<p><em>No journal entries found in your world. Create a Journal Entry first!</em></p>";
     }
     return journalsToRender.map(j => `
-      <div style="margin-bottom:6px;">
-        <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+      <div class="wos-journal-select-item">
+        <label style="cursor:pointer; display:flex; align-items:center; gap:10px; width:100%;">
           <input type="checkbox" name="selectedBounties" value="${j.id}" checked />
-          <strong>${j.name}</strong>
+          <span style="font-weight:bold;">${j.name}</span>
         </label>
       </div>
     `).join("");
@@ -901,13 +917,17 @@ async function createBountyBoard() {
       </div>
 
       <div class="form-group">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
           <label><strong>Select Journal Entries for Board:</strong></label>
-          <label style="font-size:0.8rem; cursor:pointer;">
-            <input type="checkbox" id="wos-show-all-journals" ${detectedBounties.length === 0 ? 'checked' : ''} /> Show all world journals (${nonBoardJournals.length})
-          </label>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <button type="button" id="wos-select-all-btn" class="wos-small-btn"><i class="fas fa-check-square"></i> Select All</button>
+            <button type="button" id="wos-deselect-all-btn" class="wos-small-btn"><i class="far fa-square"></i> Deselect All</button>
+            <label style="font-size:0.8rem; cursor:pointer; margin-left:4px;">
+              <input type="checkbox" id="wos-show-all-journals" ${detectedBounties.length === 0 ? 'checked' : ''} /> Show all world journals (${nonBoardJournals.length})
+            </label>
+          </div>
         </div>
-        <div id="wos-journal-select-list" style="max-height: 240px; overflow-y: auto; border: 1px solid #ccc; padding: 8px; background: #fafafa; border-radius: 4px;">
+        <div id="wos-journal-select-list" class="wos-bounty-select-scroll-area">
           ${renderList(displayJournals)}
         </div>
       </div>
@@ -967,6 +987,18 @@ async function createBountyBoard() {
     render: (html) => {
       const showAllCb = html.find("#wos-show-all-journals");
       const listContainer = html.find("#wos-journal-select-list");
+      const selectAllBtn = html.find("#wos-select-all-btn");
+      const deselectAllBtn = html.find("#wos-deselect-all-btn");
+
+      selectAllBtn.on("click", (ev) => {
+        ev.preventDefault();
+        html.find('input[name="selectedBounties"]').prop("checked", true);
+      });
+
+      deselectAllBtn.on("click", (ev) => {
+        ev.preventDefault();
+        html.find('input[name="selectedBounties"]').prop("checked", false);
+      });
 
       showAllCb.on("change", (ev) => {
         const showAll = ev.target.checked;
@@ -974,7 +1006,7 @@ async function createBountyBoard() {
         listContainer.html(renderList(targetList));
       });
     }
-  }, { width: 540 }).render(true);
+  }, { width: 560 }).render(true);
 }
 
 /**
@@ -1073,11 +1105,22 @@ function createBountyForm(initialData = {}) {
         </div>
         <div class="form-group">
           <div class="wos-form-label-row">
-            <label>Crime:</label>
-            <button type="button" class="wos-reroll-btn" data-reroll="crime" title="Re-roll Crime"><i class="fas fa-dice"></i></button>
+            <label>Bounty Status:</label>
+            <button type="button" class="wos-reroll-btn" data-reroll="status" title="Re-roll Bounty Status"><i class="fas fa-dice"></i></button>
           </div>
-          <input type="text" name="crime" value="${data.crime}" placeholder="e.g. Theft" />
+          <select name="status">
+            <option value="open" ${(data.status || 'open') === 'open' ? 'selected' : ''}>Open (Active)</option>
+            <option value="completed" ${data.status === 'completed' ? 'selected' : ''}>Completed</option>
+            <option value="closed" ${data.status === 'closed' ? 'selected' : ''}>Closed / Cancelled</option>
+          </select>
         </div>
+      </div>
+      <div class="form-group">
+        <div class="wos-form-label-row">
+          <label>Crime:</label>
+          <button type="button" class="wos-reroll-btn" data-reroll="crime" title="Re-roll Crime"><i class="fas fa-dice"></i></button>
+        </div>
+        <input type="text" name="crime" value="${data.crime}" placeholder="e.g. Theft" />
       </div>
 
       <div class="wos-bounty-form-row">
@@ -1593,61 +1636,167 @@ async function ensureWorldMacros() {
   }
 }
 
-// 1-Click Interactive Bounty Level Editing directly on Journal Sheets
+// 1-Click Interactive Bounty Level & Status Editing directly on Journal Sheets
 Hooks.on("renderJournalPageSheet", (sheet, html) => {
   if (!game.user?.isGM) return;
 
+  // 1. Single Bounty Sheet Handlers
   const container = html.find(".wos-bounty-container");
-  if (!container.length) return;
+  if (container.length && !container.parents(".wos-bounty-board-card").length) {
+    const headerRight = container.find(".wos-bounty-header-right");
 
-  const headerRight = container.find(".wos-bounty-header-right");
-  if (headerRight.length && !headerRight.find(".wos-edit-bounty-btn").length) {
-    const editBtn = $('<button type="button" class="wos-edit-bounty-btn" title="Edit Bounty Details"><i class="fas fa-edit"></i> Edit</button>');
-    editBtn.on("click", (ev) => {
-      ev.stopPropagation();
+    const getRawBountyData = () => {
       const rawData = container.attr("data-bounty-data");
-      let data = {};
-      if (rawData) {
-        try { data = JSON.parse(rawData.replace(/&apos;/g, "'")); } catch(e) {}
+      if (!rawData) return {};
+      try { return JSON.parse(decodeURIComponent(rawData)); } catch(e) {
+        try { return JSON.parse(rawData.replace(/&apos;/g, "'")); } catch(err) { return {}; }
       }
-      createBountyForm(data);
+    };
+
+    if (headerRight.length && !headerRight.find(".wos-edit-bounty-btn").length) {
+      const editBtn = $('<button type="button" class="wos-edit-bounty-btn" title="Edit Bounty Details"><i class="fas fa-edit"></i> Edit</button>');
+      editBtn.on("click", (ev) => {
+        ev.stopPropagation();
+        createBountyForm(getRawBountyData());
+      });
+      headerRight.append(editBtn);
+    }
+
+    if (headerRight.length && !headerRight.find(".wos-status-toggle-btn").length) {
+      const bountyData = getRawBountyData();
+      const currentStatus = bountyData.status || "open";
+      let statusBtnLabel = "Open";
+      let statusBtnClass = "wos-btn-open";
+      let statusBtnIcon = "fa-folder-open";
+
+      if (currentStatus === "completed") {
+        statusBtnLabel = "Completed";
+        statusBtnClass = "wos-btn-completed";
+        statusBtnIcon = "fa-check-circle";
+      } else if (currentStatus === "closed") {
+        statusBtnLabel = "Closed";
+        statusBtnClass = "wos-btn-closed";
+        statusBtnIcon = "fa-times-circle";
+      }
+
+      const statusBtn = $(`<button type="button" class="wos-status-toggle-btn ${statusBtnClass}" title="Click to change status (Open -> Completed -> Closed)"><i class="fas ${statusBtnIcon}"></i> ${statusBtnLabel}</button>`);
+      statusBtn.on("click", async (ev) => {
+        ev.stopPropagation();
+        let nextStatus = "completed";
+        if (currentStatus === "open") nextStatus = "completed";
+        else if (currentStatus === "completed") nextStatus = "closed";
+        else if (currentStatus === "closed") nextStatus = "open";
+
+        bountyData.status = nextStatus;
+        const newHTML = renderBountyHTML(bountyData);
+        const page = sheet.pageDocument || sheet.document;
+        if (page) {
+          await page.update({ "text.content": newHTML });
+          ui.notifications?.info(`Bounty status updated to "${nextStatus.toUpperCase()}".`);
+        }
+      });
+      headerRight.append(statusBtn);
+    }
+
+    container.find(".wos-circle-option[data-bl]").on("click", async (ev) => {
+      ev.stopPropagation();
+      const newBL = parseInt($(ev.currentTarget).attr("data-bl"));
+      if (!newBL || newBL < 1 || newBL > 9) return;
+
+      const bountyData = getRawBountyData();
+      if (bountyData.bountyLevel === newBL) return;
+
+      const confirm = await Dialog.confirm({
+        title: `Change Bounty Level to BL:${newBL}?`,
+        content: `<p>Change Bounty Level from <strong>BL:${bountyData.bountyLevel || 1}</strong> to <strong>BL:${newBL} (${WOS_DATA.BOUNTY_LEVELS[newBL].name})</strong>?</p><p>Also re-roll suggested reward (${WOS_DATA.BOUNTY_LEVELS[newBL].payscale})?</p>`,
+        yes: () => true,
+        no: () => false,
+        defaultYes: true
+      });
+
+      if (confirm) {
+        bountyData.bountyLevel = newBL;
+        bountyData.reward = WOS_DATA.BOUNTY_LEVELS[newBL].rollReward();
+
+        const newHTML = renderBountyHTML(bountyData);
+        const page = sheet.pageDocument || sheet.document;
+        if (page) {
+          await page.update({ "text.content": newHTML });
+          ui.notifications?.info(`Updated Bounty Level to BL:${newBL} (${bountyData.reward}).`);
+        }
+      }
     });
-    headerRight.append(editBtn);
   }
 
-  container.find(".wos-circle-option[data-bl]").on("click", async (ev) => {
-    ev.stopPropagation();
-    const newBL = parseInt($(ev.currentTarget).attr("data-bl"));
-    if (!newBL || newBL < 1 || newBL > 9) return;
+  // 2. Bounty Board Sheet Card Status Toggle Handlers
+  const boardContainer = html.find(".wos-bounty-board-container");
+  if (boardContainer.length) {
+    const cards = boardContainer.find(".wos-bounty-board-card");
+    cards.each((idx, cardEl) => {
+      const card = $(cardEl);
+      const bContainer = card.find(".wos-bounty-container");
+      if (!bContainer.length) return;
 
-    const rawData = container.attr("data-bounty-data");
-    let bountyData = {};
-    if (rawData) {
-      try { bountyData = JSON.parse(rawData.replace(/&apos;/g, "'")); } catch(e) {}
-    }
+      const headerRight = bContainer.find(".wos-bounty-header-right");
+      if (headerRight.length && !headerRight.find(".wos-board-card-status-btn").length) {
+        let cardStatus = "open";
+        if (bContainer.hasClass("wos-status-completed") || bContainer.find(".wos-stamp-completed").length) {
+          cardStatus = "completed";
+        } else if (bContainer.hasClass("wos-status-closed") || bContainer.find(".wos-stamp-closed").length) {
+          cardStatus = "closed";
+        }
 
-    if (bountyData.bountyLevel === newBL) return;
+        let icon = "fa-folder-open";
+        let label = "Open";
+        let btnClass = "wos-btn-open";
+        if (cardStatus === "completed") { icon = "fa-check-circle"; label = "Completed"; btnClass = "wos-btn-completed"; }
+        else if (cardStatus === "closed") { icon = "fa-times-circle"; label = "Closed"; btnClass = "wos-btn-closed"; }
 
-    const confirm = await Dialog.confirm({
-      title: `Change Bounty Level to BL:${newBL}?`,
-      content: `<p>Change Bounty Level from <strong>BL:${bountyData.bountyLevel || 1}</strong> to <strong>BL:${newBL} (${WOS_DATA.BOUNTY_LEVELS[newBL].name})</strong>?</p><p>Also re-roll suggested reward (${WOS_DATA.BOUNTY_LEVELS[newBL].payscale})?</p>`,
-      yes: () => true,
-      no: () => false,
-      defaultYes: true
-    });
+        const toggleBtn = $(`<button type="button" class="wos-status-toggle-btn ${btnClass}" style="margin-left:6px; cursor:pointer; font-size:0.75rem; padding:2px 6px;" title="GM Status Toggle (Open -> Completed -> Closed)"><i class="fas ${icon}"></i> ${label}</button>`);
 
-    if (confirm) {
-      bountyData.bountyLevel = newBL;
-      bountyData.reward = WOS_DATA.BOUNTY_LEVELS[newBL].rollReward();
+        toggleBtn.on("click", async (ev) => {
+          ev.stopPropagation();
+          let nextStatus = "completed";
+          if (cardStatus === "open") nextStatus = "completed";
+          else if (cardStatus === "completed") nextStatus = "closed";
+          else if (cardStatus === "closed") nextStatus = "open";
 
-      const newHTML = renderBountyHTML(bountyData);
-      const page = sheet.pageDocument || sheet.document;
-      if (page) {
-        await page.update({ "text.content": newHTML });
-        ui.notifications?.info(`Updated Bounty Level to BL:${newBL} (${bountyData.reward}).`);
+          const page = sheet.pageDocument || sheet.document;
+          if (page) {
+            const docContent = page.text?.content || "";
+            if (typeof DOMParser !== "undefined") {
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(docContent, "text/html");
+              const targetCards = doc.querySelectorAll(".wos-bounty-board-card");
+              if (targetCards[idx]) {
+                const targetContainer = targetCards[idx].querySelector(".wos-bounty-container");
+                if (targetContainer) {
+                  targetContainer.classList.remove("wos-status-open", "wos-status-completed", "wos-status-closed");
+                  targetContainer.classList.add(`wos-status-${nextStatus}`);
+
+                  const oldStamp = targetContainer.querySelector(".wos-bounty-stamp-overlay");
+                  if (oldStamp) oldStamp.remove();
+
+                  if (nextStatus !== "open") {
+                    const posterBox = targetContainer.querySelector(".wos-bounty-poster-box");
+                    if (posterBox) {
+                      const stampDiv = doc.createElement("div");
+                      stampDiv.className = `wos-bounty-stamp-overlay wos-stamp-${nextStatus}`;
+                      stampDiv.innerHTML = `<span>${nextStatus === "completed" ? "COMPLETED" : "CLOSED"}</span>`;
+                      posterBox.insertBefore(stampDiv, posterBox.firstChild);
+                    }
+                  }
+                  await page.update({ "text.content": doc.body.innerHTML });
+                  ui.notifications?.info(`Bounty Board #${idx + 1} marked as "${nextStatus.toUpperCase()}".`);
+                }
+              }
+            }
+          }
+        });
+        headerRight.append(toggleBtn);
       }
-    }
-  });
+    });
+  }
 });
 
 // Hook into Foundry initialization

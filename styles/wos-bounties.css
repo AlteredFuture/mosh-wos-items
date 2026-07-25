@@ -575,3 +575,117 @@
 .wos-unknown-checkbox-label:hover {
   color: #000;
 }
+
+/* Bounty Status Overlay Stamps & Toggle Buttons */
+.wos-bounty-poster-box {
+  position: relative;
+  overflow: hidden;
+}
+
+.wos-bounty-stamp-overlay {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-14deg);
+  z-index: 25;
+  pointer-events: none;
+  font-weight: 900;
+  font-size: 1.9rem;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  padding: 6px 20px;
+  border: 4px solid currentColor;
+  border-radius: 4px;
+  box-shadow: 0 0 12px rgba(0,0,0,0.6);
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.wos-bounty-stamp-overlay.wos-stamp-completed {
+  color: #d32f2f;
+  background-color: rgba(255, 235, 238, 0.92);
+  border-color: #b71c1c;
+  outline: 2px dashed #b71c1c;
+  outline-offset: 3px;
+}
+
+.wos-bounty-stamp-overlay.wos-stamp-closed {
+  color: #37474f;
+  background-color: rgba(236, 239, 241, 0.92);
+  border-color: #263238;
+  outline: 2px dashed #263238;
+  outline-offset: 3px;
+}
+
+.wos-status-toggle-btn {
+  border: 1px solid #111;
+  padding: 3px 8px;
+  font-weight: bold;
+  font-size: 0.8rem;
+  border-radius: 3px;
+  cursor: pointer;
+  margin-left: 6px;
+  transition: all 0.2s ease;
+}
+
+.wos-status-toggle-btn.wos-btn-open,
+.wos-status-toggle-btn.wos-status-open {
+  background-color: #388e3c;
+  color: #fff;
+}
+
+.wos-status-toggle-btn.wos-btn-completed,
+.wos-status-toggle-btn.wos-status-completed {
+  background-color: #d32f2f;
+  color: #fff;
+}
+
+.wos-status-toggle-btn.wos-btn-closed,
+.wos-status-toggle-btn.wos-status-closed {
+  background-color: #455a64;
+  color: #fff;
+}
+
+.wos-status-toggle-btn:hover {
+  opacity: 0.85;
+  transform: scale(1.05);
+}
+
+/* Scroll Area for Bounty Board Dialog */
+.wos-bounty-select-scroll-area {
+  max-height: 260px;
+  min-height: 140px;
+  overflow-y: auto;
+  border: 2px solid #333;
+  padding: 8px;
+  background-color: #fafafa;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.wos-journal-select-item {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eee;
+  transition: background-color 0.15s ease;
+  border-radius: 3px;
+}
+
+.wos-journal-select-item:hover {
+  background-color: #fff3c4;
+}
+
+.wos-small-btn {
+  background-color: #e0e0e0;
+  border: 1px solid #999;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.15s ease;
+}
+
+.wos-small-btn:hover {
+  background-color: #d5d5d5;
+}
