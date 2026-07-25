@@ -458,8 +458,10 @@ function renderBountyHTML(data = {}) {
     ? `<div class="wos-bounty-stamp-overlay wos-stamp-${status}"><span>${status === "completed" ? "COMPLETED" : "CLOSED"}</span></div>`
     : "";
 
+  const sourceJournalId = data.sourceJournalId || "";
+
   return `
-<div class="wos-bounty-container wos-bl-${bountyLevel} wos-status-${status} ${isUnknown ? 'wos-is-unknown' : ''}" data-bounty-data="${encodeURIComponent(JSON.stringify(data))}">
+<div class="wos-bounty-container wos-bl-${bountyLevel} wos-status-${status} ${isUnknown ? 'wos-is-unknown' : ''}" data-bounty-data="${encodeURIComponent(JSON.stringify(data))}" data-source-journal-id="${sourceJournalId}">
   <div class="wos-bounty-header">
     <div class="wos-bounty-header-left">
       <div class="wos-bounty-badge">${isUnknown ? 'UNKNOWN BOUNTY' : 'BOUNTY'}</div>
@@ -567,6 +569,7 @@ function renderPlayerBountyHTML(data = {}) {
   const briefing = data.briefing || "No briefing provided.";
   const footnotes = data.footnotes || "";
   const charCode = data.charCode || generateCharCode();
+  const sourceJournalId = data.sourceJournalId || "";
 
   const levelsHTML = [1,2,3,4,5,6,7,8,9].map(lvl => 
     `<span class="wos-circle-option ${lvl === bountyLevel ? 'wos-active' : ''}">${lvl}</span>`
@@ -600,7 +603,7 @@ function renderPlayerBountyHTML(data = {}) {
     : "";
 
   return `
-<div class="wos-bounty-container wos-bl-${bountyLevel} wos-status-${status} ${isUnknown ? 'wos-is-unknown' : ''}">
+<div class="wos-bounty-container wos-bl-${bountyLevel} wos-status-${status} ${isUnknown ? 'wos-is-unknown' : ''}" data-bounty-data="${encodeURIComponent(JSON.stringify(data))}" data-source-journal-id="${sourceJournalId}">
   <div class="wos-bounty-header">
     <div class="wos-bounty-header-left">
       <div class="wos-bounty-badge">${isUnknown ? 'UNKNOWN BOUNTY' : 'PUBLIC BOUNTY'}</div>
@@ -671,7 +674,7 @@ function renderPlayerBountyHTML(data = {}) {
  */
 function renderBountyBoardHTML(bountiesList = [], boardTitle = "Bounty Board") {
   const cardsHTML = bountiesList.map(b => `
-    <div class="wos-bounty-board-card">
+    <div class="wos-bounty-board-card" data-source-journal-id="${b.sourceJournalId || ''}" data-char-code="${b.charCode || ''}">
       ${renderPlayerBountyHTML(b)}
     </div>
   `).join("\n\n");
@@ -687,12 +690,180 @@ function renderBountyBoardHTML(bountiesList = [], boardTitle = "Bounty Board") {
 }
 
 /**
+ * Synchronizes all linked Bounty Boards and Player View Journals with updated main bounty data
+ */
+async function syncLinkedBounties(sourceJournalId, updatedData = {}) {
+  if (!sourceJournalId) return;
+
+  updatedData.sourceJournalId = sourceJournalId;
+  const allJournals = getWorldJournals();
+  let syncedBoardsCount = 0;
+  let syncedPlayerJournalsCount = 0;
+
+  for (const j of allJournals) {
+    if (j.id === sourceJournalId) continue;
+
+    const pages = j.pages?.contents || Array.from(j.pages || []);
+    const page = pages[0];
+    if (!page) continue;
+
+    const content = page.text?.content || "";
+
+    // 1. Standalone Player View Journal Entry
+    const isPlayerViewName = j.name.startsWith("[Player View]");
+    const parsedData = extractBountyDataFromJournal(j);
+    const isLinkedPlayerJournal = parsedData.sourceJournalId === sourceJournalId ||
+                                 (updatedData.linkedPlayerJournalId && j.id === updatedData.linkedPlayerJournalId) ||
+                                 (isPlayerViewName && parsedData.charCode === updatedData.charCode);
+
+    if (isLinkedPlayerJournal && content.includes("wos-bounty-container") && !content.includes("wos-bounty-board-container")) {
+      const newPlayerHTML = renderPlayerBountyHTML(updatedData);
+      await page.update({ "text.content": newPlayerHTML });
+      syncedPlayerJournalsCount++;
+      continue;
+    }
+
+    // 2. Bounty Board Journal Entry containing cards
+    if (content.includes("wos-bounty-board-container")) {
+      if (typeof DOMParser !== "undefined") {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(content, "text/html");
+        const cards = doc.querySelectorAll(".wos-bounty-board-card");
+        let boardWasUpdated = false;
+
+        cards.forEach(card => {
+          const cardSourceId = card.getAttribute("data-source-journal-id");
+          const cardCharCode = card.getAttribute("data-char-code");
+          const bContainer = card.querySelector(".wos-bounty-container");
+          const bSourceId = bContainer?.getAttribute("data-source-journal-id");
+
+          if (cardSourceId === sourceJournalId || bSourceId === sourceJournalId || (cardCharCode && cardCharCode === updatedData.charCode)) {
+            const newCardHTML = renderPlayerBountyHTML(updatedData);
+            card.setAttribute("data-source-journal-id", sourceJournalId);
+            card.setAttribute("data-char-code", updatedData.charCode || "");
+            card.innerHTML = newCardHTML;
+            boardWasUpdated = true;
+          }
+        });
+
+        if (boardWasUpdated) {
+          await page.update({ "text.content": doc.body.innerHTML });
+          syncedBoardsCount++;
+        }
+      }
+    }
+  }
+
+  if (syncedBoardsCount > 0 || syncedPlayerJournalsCount > 0) {
+    ui.notifications?.info(`Synced ${syncedBoardsCount} Bounty Board(s) and ${syncedPlayerJournalsCount} Player View(s) with updated bounty data.`);
+  }
+}
+
+/**
+ * Creates or updates a standalone Player View Journal Entry for a bounty with Observer permissions
+ */
+async function publishPlayerBountyJournal(sourceJournal, bountyData = {}) {
+  const sourceJournalId = sourceJournal?.id || bountyData.sourceJournalId || "";
+  if (sourceJournalId) bountyData.sourceJournalId = sourceJournalId;
+
+  const rawTarget = bountyData.target || "Unknown Target";
+  const cleanTargetName = rawTarget.replace(/@UUID\[[^\]]+\]\{([^}]+)\}/, "$1");
+  const playerJournalName = `[Player View] Bounty: ${cleanTargetName}`;
+  const playerHTML = renderPlayerBountyHTML(bountyData);
+
+  const allJournals = getWorldJournals();
+  let existingPlayerJournal = allJournals.find(j => 
+    j.id === bountyData.linkedPlayerJournalId || 
+    (j.name === playerJournalName && j.id !== sourceJournalId) ||
+    (j.name.startsWith("[Player View]") && extractBountyDataFromJournal(j).sourceJournalId === sourceJournalId)
+  );
+
+  if (existingPlayerJournal) {
+    const page = existingPlayerJournal.pages?.contents?.[0] || Array.from(existingPlayerJournal.pages || [])[0];
+    if (page) {
+      await page.update({ "text.content": playerHTML });
+      ui.notifications?.info(`Updated Player View Journal "${playerJournalName}".`);
+      existingPlayerJournal.sheet.render(true);
+    }
+    return existingPlayerJournal;
+  } else {
+    const observerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OBSERVER ?? 2;
+    const newJournal = await JournalEntry.create({
+      name: playerJournalName,
+      ownership: {
+        default: observerLevel
+      },
+      pages: [{
+        name: `Bounty - ${cleanTargetName}`,
+        type: "text",
+        text: {
+          content: playerHTML,
+          format: 1
+        }
+      }]
+    });
+
+    if (newJournal) {
+      bountyData.linkedPlayerJournalId = newJournal.id;
+      if (sourceJournal) {
+        const sourcePage = sourceJournal.pages?.contents?.[0] || Array.from(sourceJournal.pages || [])[0];
+        if (sourcePage) {
+          await sourcePage.update({ "text.content": renderBountyHTML(bountyData) });
+        }
+      }
+      ui.notifications?.info(`Published Player View Journal "${playerJournalName}".`);
+      newJournal.sheet.render(true);
+    }
+    return newJournal;
+  }
+}
+
+/**
+ * Broadcasts socket message to render player-facing bounty poster on connected screens
+ */
+function showBountyToPlayers(bountyData = {}) {
+  const rawTarget = bountyData.target || "Unknown Target";
+  const cleanTargetName = rawTarget.replace(/@UUID\[[^\]]+\]\{([^}]+)\}/, "$1");
+
+  if (game.socket) {
+    game.socket.emit("module.mosh-wos-items", {
+      action: "showBounty",
+      bountyData: bountyData
+    });
+  }
+
+  renderPlayerBountyPopup(bountyData);
+  ui.notifications?.info(`Broadcasted Player Bounty for "${cleanTargetName}" to connected players.`);
+}
+
+/**
+ * Displays interactive/viewable player-facing bounty poster popup modal
+ */
+function renderPlayerBountyPopup(bountyData = {}) {
+  const rawTarget = bountyData.target || "Unknown Target";
+  const cleanTargetName = rawTarget.replace(/@UUID\[[^\]]+\]\{([^}]+)\}/, "$1");
+  const playerHTML = renderPlayerBountyHTML(bountyData);
+
+  new Dialog({
+    title: `WANTED: ${cleanTargetName.toUpperCase()} (Wages of Sin)`,
+    content: `<div class="wos-player-popup-wrapper" style="max-height:80vh; overflow-y:auto;">${playerHTML}</div>`,
+    buttons: {
+      close: {
+        icon: '<i class="fas fa-times"></i>',
+        label: "Close"
+      }
+    },
+    default: "close"
+  }, { width: 720, resizable: true }).render(true);
+}
+
+/**
  * Creates a Journal Entry document in Foundry VTT
  */
 async function createBountyJournalEntry(data) {
   const rawTarget = data.target || "Unknown Target";
   const cleanTargetName = rawTarget.replace(/@UUID\[[^\]]+\]\{([^}]+)\}/, "$1");
-  const htmlContent = renderBountyHTML(data);
+  const initialHTML = renderBountyHTML(data);
 
   const entryData = {
     name: `Bounty: ${cleanTargetName}`,
@@ -700,7 +871,7 @@ async function createBountyJournalEntry(data) {
       name: `Bounty - ${cleanTargetName}`,
       type: "text",
       text: {
-        content: htmlContent,
+        content: initialHTML,
         format: 1
       }
     }]
@@ -708,6 +879,12 @@ async function createBountyJournalEntry(data) {
 
   const journal = await JournalEntry.create(entryData);
   if (journal) {
+    data.sourceJournalId = journal.id;
+    const finalHTML = renderBountyHTML(data);
+    const page = journal.pages?.contents?.[0] || Array.from(journal.pages || [])[0];
+    if (page) {
+      await page.update({ "text.content": finalHTML });
+    }
     ui.notifications?.info(`Bounty Journal Entry created for "${cleanTargetName}".`);
     journal.sheet.render(true);
   }
@@ -727,11 +904,15 @@ function extractBountyDataFromJournal(journal) {
   if (matchEncoded) {
     try {
       const decodedStr = decodeURIComponent(matchEncoded[1]);
-      return JSON.parse(decodedStr);
+      const parsed = JSON.parse(decodedStr);
+      if (!parsed.sourceJournalId) parsed.sourceJournalId = journal.id;
+      return parsed;
     } catch(e) {
       try {
         const decodedLegacy = matchEncoded[1].replace(/&apos;/g, "'");
-        return JSON.parse(decodedLegacy);
+        const parsed = JSON.parse(decodedLegacy);
+        if (!parsed.sourceJournalId) parsed.sourceJournalId = journal.id;
+        return parsed;
       } catch(err) {}
     }
   }
@@ -757,6 +938,7 @@ function extractBountyDataFromJournal(journal) {
   let complications = [];
   let footnotes = "";
   let charCode = generateCharCode();
+  let sourceJournalId = journal.id;
 
   try {
     if (typeof DOMParser !== "undefined") {
@@ -770,6 +952,8 @@ function extractBountyDataFromJournal(journal) {
         if (container.classList.contains("wos-is-unknown")) isUnknown = true;
         if (container.classList.contains("wos-status-completed") || doc.querySelector(".wos-stamp-completed")) status = "completed";
         else if (container.classList.contains("wos-status-closed") || doc.querySelector(".wos-stamp-closed")) status = "closed";
+        const attrSource = container.getAttribute("data-source-journal-id");
+        if (attrSource) sourceJournalId = attrSource;
       }
 
       const titleEl = doc.querySelector(".wos-bounty-title");
@@ -870,7 +1054,8 @@ function extractBountyDataFromJournal(journal) {
     consequences: consequences || "Standard enforcement protocols apply upon turn-in.",
     complications: complications,
     footnotes: footnotes,
-    charCode: charCode
+    charCode: charCode,
+    sourceJournalId: sourceJournalId
   };
 }
 
@@ -1012,11 +1197,14 @@ async function createBountyBoard() {
 /**
  * Form Dialog to input and create or edit a bounty
  */
-function createBountyForm(initialData = {}) {
+function createBountyForm(initialData = {}, editingJournal = null) {
   const data = {
+    sourceJournalId: initialData.sourceJournalId || (editingJournal?.id || ""),
+    linkedPlayerJournalId: initialData.linkedPlayerJournalId || "",
     target: initialData.target || "",
     targetUuid: initialData.targetUuid || "",
     isUnknown: Boolean(initialData.isUnknown),
+    status: initialData.status || "open",
     bountyLevel: initialData.bountyLevel || 1,
     crime: initialData.crime || "",
     wantedStatus: initialData.wantedStatus || "Alive",
@@ -1236,13 +1424,13 @@ function createBountyForm(initialData = {}) {
   `;
 
   new Dialog({
-    title: "Wages of Sin — Create / Edit Bounty",
+    title: editingJournal ? `Wages of Sin — Edit Bounty: ${data.target}` : "Wages of Sin — Create Bounty",
     content: formHTML,
     buttons: {
       create: {
-        icon: '<i class="fas fa-check"></i>',
-        label: "Create Journal Entry",
-        callback: (html) => {
+        icon: '<i class="fas fa-save"></i>',
+        label: editingJournal ? "Save & Sync Bounty" : "Create Journal Entry",
+        callback: async (html) => {
           const form = html.find("form")[0];
           const complicationsText = form.complications.value.trim();
           const complicationsList = complicationsText 
@@ -1253,12 +1441,15 @@ function createBountyForm(initialData = {}) {
           const isUnknown = form.isUnknown ? form.isUnknown.checked : false;
 
           const bountyData = {
+            sourceJournalId: data.sourceJournalId || (editingJournal ? editingJournal.id : ""),
+            linkedPlayerJournalId: data.linkedPlayerJournalId || "",
             target: form.target.value.trim() || (isUnknown ? "UNKNOWN TARGET" : "Unknown Target"),
             targetUuid: form.targetUuid.value.trim(),
             isUnknown: isUnknown,
             img: form.img.value.trim(),
             bountyLevel: selectedBL,
             wantedStatus: form.wantedStatus.value,
+            status: form.status.value,
             crime: form.crime.value.trim() || "Unspecified Offense",
             client: form.client.value.trim() || "Unknown Client",
             reward: form.reward.value.trim() || "Negotiable",
@@ -1275,7 +1466,19 @@ function createBountyForm(initialData = {}) {
             charCode: form.charCode.value.trim() || generateCharCode()
           };
 
-          createBountyJournalEntry(bountyData);
+          if (editingJournal) {
+            bountyData.sourceJournalId = editingJournal.id;
+            const cleanTargetName = bountyData.target.replace(/@UUID\[[^\]]+\]\{([^}]+)\}/, "$1");
+            const updatedHTML = renderBountyHTML(bountyData);
+            const page = editingJournal.pages?.contents?.[0] || Array.from(editingJournal.pages || [])[0];
+            if (page) {
+              await page.update({ "text.content": updatedHTML });
+              ui.notifications?.info(`Updated Bounty Journal Entry for "${cleanTargetName}".`);
+              await syncLinkedBounties(editingJournal.id, bountyData);
+            }
+          } else {
+            createBountyJournalEntry(bountyData);
+          }
         }
       },
       cancel: {
@@ -1636,9 +1839,12 @@ async function ensureWorldMacros() {
   }
 }
 
-// 1-Click Interactive Bounty Level & Status Editing directly on Journal Sheets
+// Interactive Bounty Level, Status & Player View Sharing directly on Journal Sheets
 Hooks.on("renderJournalPageSheet", (sheet, html) => {
   if (!game.user?.isGM) return;
+
+  const journalDoc = sheet.document || sheet.pageDocument?.parent || sheet.object;
+  const pageDoc = sheet.pageDocument || sheet.document;
 
   // 1. Single Bounty Sheet Handlers
   const container = html.find(".wos-bounty-container");
@@ -1647,19 +1853,43 @@ Hooks.on("renderJournalPageSheet", (sheet, html) => {
 
     const getRawBountyData = () => {
       const rawData = container.attr("data-bounty-data");
-      if (!rawData) return {};
-      try { return JSON.parse(decodeURIComponent(rawData)); } catch(e) {
-        try { return JSON.parse(rawData.replace(/&apos;/g, "'")); } catch(err) { return {}; }
+      let data = {};
+      if (rawData) {
+        try { data = JSON.parse(decodeURIComponent(rawData)); } catch(e) {
+          try { data = JSON.parse(rawData.replace(/&apos;/g, "'")); } catch(err) {}
+        }
       }
+      if (!data.sourceJournalId && journalDoc?.id) {
+        data.sourceJournalId = journalDoc.id;
+      }
+      return data;
     };
 
     if (headerRight.length && !headerRight.find(".wos-edit-bounty-btn").length) {
       const editBtn = $('<button type="button" class="wos-edit-bounty-btn" title="Edit Bounty Details"><i class="fas fa-edit"></i> Edit</button>');
       editBtn.on("click", (ev) => {
         ev.stopPropagation();
-        createBountyForm(getRawBountyData());
+        createBountyForm(getRawBountyData(), journalDoc);
       });
       headerRight.append(editBtn);
+    }
+
+    if (headerRight.length && !headerRight.find(".wos-show-player-btn").length) {
+      const showPlayerBtn = $('<button type="button" class="wos-show-player-btn" title="Show Player Version to Connected Players"><i class="fas fa-eye"></i> Show Players</button>');
+      showPlayerBtn.on("click", (ev) => {
+        ev.stopPropagation();
+        showBountyToPlayers(getRawBountyData());
+      });
+      headerRight.append(showPlayerBtn);
+    }
+
+    if (headerRight.length && !headerRight.find(".wos-publish-player-btn").length) {
+      const publishBtn = $('<button type="button" class="wos-publish-player-btn" title="Create or Update Public Player View Journal"><i class="fas fa-share-alt"></i> Publish View</button>');
+      publishBtn.on("click", async (ev) => {
+        ev.stopPropagation();
+        await publishPlayerBountyJournal(journalDoc, getRawBountyData());
+      });
+      headerRight.append(publishBtn);
     }
 
     if (headerRight.length && !headerRight.find(".wos-status-toggle-btn").length) {
@@ -1688,11 +1918,13 @@ Hooks.on("renderJournalPageSheet", (sheet, html) => {
         else if (currentStatus === "closed") nextStatus = "open";
 
         bountyData.status = nextStatus;
+        if (journalDoc?.id) bountyData.sourceJournalId = journalDoc.id;
+
         const newHTML = renderBountyHTML(bountyData);
-        const page = sheet.pageDocument || sheet.document;
-        if (page) {
-          await page.update({ "text.content": newHTML });
+        if (pageDoc) {
+          await pageDoc.update({ "text.content": newHTML });
           ui.notifications?.info(`Bounty status updated to "${nextStatus.toUpperCase()}".`);
+          await syncLinkedBounties(journalDoc?.id || bountyData.sourceJournalId, bountyData);
         }
       });
       headerRight.append(statusBtn);
@@ -1717,18 +1949,19 @@ Hooks.on("renderJournalPageSheet", (sheet, html) => {
       if (confirm) {
         bountyData.bountyLevel = newBL;
         bountyData.reward = WOS_DATA.BOUNTY_LEVELS[newBL].rollReward();
+        if (journalDoc?.id) bountyData.sourceJournalId = journalDoc.id;
 
         const newHTML = renderBountyHTML(bountyData);
-        const page = sheet.pageDocument || sheet.document;
-        if (page) {
-          await page.update({ "text.content": newHTML });
+        if (pageDoc) {
+          await pageDoc.update({ "text.content": newHTML });
           ui.notifications?.info(`Updated Bounty Level to BL:${newBL} (${bountyData.reward}).`);
+          await syncLinkedBounties(journalDoc?.id || bountyData.sourceJournalId, bountyData);
         }
       }
     });
   }
 
-  // 2. Bounty Board Sheet Card Status Toggle Handlers
+  // 2. Bounty Board Sheet Card Handlers
   const boardContainer = html.find(".wos-bounty-board-container");
   if (boardContainer.length) {
     const cards = boardContainer.find(".wos-bounty-board-card");
@@ -1737,9 +1970,29 @@ Hooks.on("renderJournalPageSheet", (sheet, html) => {
       const bContainer = card.find(".wos-bounty-container");
       if (!bContainer.length) return;
 
+      const cardSourceId = card.attr("data-source-journal-id") || bContainer.attr("data-source-journal-id");
+      const rawCardData = bContainer.attr("data-bounty-data");
+      let cardBountyData = {};
+      if (rawCardData) {
+        try { cardBountyData = JSON.parse(decodeURIComponent(rawCardData)); } catch(e) {
+          try { cardBountyData = JSON.parse(rawCardData.replace(/&apos;/g, "'")); } catch(err) {}
+        }
+      }
+      if (cardSourceId) cardBountyData.sourceJournalId = cardSourceId;
+
       const headerRight = bContainer.find(".wos-bounty-header-right");
+
+      if (headerRight.length && !headerRight.find(".wos-board-show-player-btn").length) {
+        const cardShowBtn = $(`<button type="button" class="wos-show-player-btn wos-board-show-player-btn" style="margin-left:6px; font-size:0.75rem; padding:2px 6px;" title="Show Player Version to Connected Players"><i class="fas fa-eye"></i> Show</button>`);
+        cardShowBtn.on("click", (ev) => {
+          ev.stopPropagation();
+          showBountyToPlayers(cardBountyData);
+        });
+        headerRight.append(cardShowBtn);
+      }
+
       if (headerRight.length && !headerRight.find(".wos-board-card-status-btn").length) {
-        let cardStatus = "open";
+        let cardStatus = cardBountyData.status || "open";
         if (bContainer.hasClass("wos-status-completed") || bContainer.find(".wos-stamp-completed").length) {
           cardStatus = "completed";
         } else if (bContainer.hasClass("wos-status-closed") || bContainer.find(".wos-stamp-closed").length) {
@@ -1752,7 +2005,7 @@ Hooks.on("renderJournalPageSheet", (sheet, html) => {
         if (cardStatus === "completed") { icon = "fa-check-circle"; label = "Completed"; btnClass = "wos-btn-completed"; }
         else if (cardStatus === "closed") { icon = "fa-times-circle"; label = "Closed"; btnClass = "wos-btn-closed"; }
 
-        const toggleBtn = $(`<button type="button" class="wos-status-toggle-btn ${btnClass}" style="margin-left:6px; cursor:pointer; font-size:0.75rem; padding:2px 6px;" title="GM Status Toggle (Open -> Completed -> Closed)"><i class="fas ${icon}"></i> ${label}</button>`);
+        const toggleBtn = $(`<button type="button" class="wos-status-toggle-btn ${btnClass} wos-board-card-status-btn" style="margin-left:6px; cursor:pointer; font-size:0.75rem; padding:2px 6px;" title="GM Status Toggle (Open -> Completed -> Closed)"><i class="fas ${icon}"></i> ${label}</button>`);
 
         toggleBtn.on("click", async (ev) => {
           ev.stopPropagation();
@@ -1761,9 +2014,10 @@ Hooks.on("renderJournalPageSheet", (sheet, html) => {
           else if (cardStatus === "completed") nextStatus = "closed";
           else if (cardStatus === "closed") nextStatus = "open";
 
-          const page = sheet.pageDocument || sheet.document;
-          if (page) {
-            const docContent = page.text?.content || "";
+          cardBountyData.status = nextStatus;
+
+          if (pageDoc) {
+            const docContent = pageDoc.text?.content || "";
             if (typeof DOMParser !== "undefined") {
               const parser = new DOMParser();
               const doc = parser.parseFromString(docContent, "text/html");
@@ -1786,8 +2040,23 @@ Hooks.on("renderJournalPageSheet", (sheet, html) => {
                       posterBox.insertBefore(stampDiv, posterBox.firstChild);
                     }
                   }
-                  await page.update({ "text.content": doc.body.innerHTML });
+                  await pageDoc.update({ "text.content": doc.body.innerHTML });
                   ui.notifications?.info(`Bounty Board #${idx + 1} marked as "${nextStatus.toUpperCase()}".`);
+
+                  // Also update main source journal if linked!
+                  if (cardSourceId) {
+                    const sourceJournal = getJournalById(cardSourceId);
+                    if (sourceJournal) {
+                      const sourceData = extractBountyDataFromJournal(sourceJournal);
+                      sourceData.status = nextStatus;
+                      sourceData.sourceJournalId = cardSourceId;
+                      const sourcePage = sourceJournal.pages?.contents?.[0] || Array.from(sourceJournal.pages || [])[0];
+                      if (sourcePage) {
+                        await sourcePage.update({ "text.content": renderBountyHTML(sourceData) });
+                        await syncLinkedBounties(cardSourceId, sourceData);
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -1810,7 +2079,20 @@ Hooks.once("ready", async () => {
   game.wos.createBountyBoard = createBountyBoard;
   game.wos.createBountyForm = createBountyForm;
   game.wos.generateBounty = generateBounty;
+  game.wos.syncLinkedBounties = syncLinkedBounties;
+  game.wos.publishPlayerBountyJournal = publishPlayerBountyJournal;
+  game.wos.showBountyToPlayers = showBountyToPlayers;
+  game.wos.renderPlayerBountyPopup = renderPlayerBountyPopup;
+
+  if (game.socket) {
+    game.socket.on("module.mosh-wos-items", (payload) => {
+      if (payload?.action === "showBounty" && payload.bountyData) {
+        renderPlayerBountyPopup(payload.bountyData);
+      }
+    });
+  }
 
   await ensureWorldMacros();
   console.log("Mothership: Wages of Sin — Bounty Generator & Board initialized.");
 });
+
