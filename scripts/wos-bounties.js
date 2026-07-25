@@ -1808,22 +1808,22 @@ async function ensureWorldMacros() {
   const macrosToEnsure = [
     {
       name: "Wages of Sin: Create Bounty (Form)",
-      img: "icons/svg/book.svg",
+      img: "modules/mosh-wos-items/icons/macros/bounty-form.svg",
       command: 'if (game.wos?.createBountyForm) { game.wos.createBountyForm(); } else { ui.notifications.error("Wages of Sin script not ready."); }'
     },
     {
       name: "Wages of Sin: Generate Bounty",
-      img: "icons/svg/d20-grey.svg",
+      img: "modules/mosh-wos-items/icons/macros/bounty-generate.svg",
       command: 'if (game.wos?.generateBounty) { game.wos.generateBounty(); } else { ui.notifications.error("Wages of Sin script not ready."); }'
     },
     {
       name: "Wages of Sin: Create Bounty Board",
-      img: "icons/svg/clipboard.svg",
+      img: "modules/mosh-wos-items/icons/macros/bounty-board.svg",
       command: 'if (game.wos?.createBountyBoard) { game.wos.createBountyBoard(); } else { ui.notifications.error("Wages of Sin script not ready."); }'
     },
     {
       name: "Wages of Sin: Upgrade & Sync All Bounties",
-      img: "icons/svg/update.svg",
+      img: "modules/mosh-wos-items/icons/macros/bounty-sync.svg",
       command: 'if (game.wos?.upgradeAllBounties) { game.wos.upgradeAllBounties(); } else { ui.notifications.error("Wages of Sin script not ready."); }'
     }
   ];
@@ -1839,6 +1839,11 @@ async function ensureWorldMacros() {
           command: mData.command
         });
         console.log(`Wages of Sin: Auto-created World Macro "${mData.name}".`);
+      } catch(e) {}
+    } else if (existing.img !== mData.img) {
+      try {
+        await existing.update({ img: mData.img });
+        console.log(`Wages of Sin: Updated icon for World Macro "${mData.name}".`);
       } catch(e) {}
     }
   }
