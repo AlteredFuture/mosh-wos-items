@@ -177,8 +177,94 @@ const WOS_DATA = {
     7: { name: "Strategic Bounties", payscale: "1D10MCR", rollReward: () => `${(Math.floor(Math.random() * 10) + 1)}Mcr`, desc: "The linchpins of organizations or those who wield terrible power directly." },
     8: { name: "Legendary Bounties", payscale: "2D10MCR", rollReward: () => `${(Math.floor(Math.random() * 10) + 1 + Math.floor(Math.random() * 10) + 1)}Mcr`, desc: "Household names or those at the secret loci of power." },
     9: { name: "Apocalyptic Bounties", payscale: "1D100MCR", rollReward: () => `${(Math.floor(Math.random() * 100) + 1)}Mcr`, desc: "Names that are only whispered. Senior executives. Rogue AI." }
-  }
+  },
+
+  TARGET_NAMES: [
+    "Markos Petraitiene", "Vera Kozlova", "Darek Vance", "Tanya Novak", "Kaelen Voss",
+    "Soren Mercer", "Lyra Sterling", "Cassian Drake", "Jaxen Reed", "Nico Richter",
+    "Elena Solokov", "Silas Thorne", "Maren Duval", "Jarek Kane", "Vesper Chen",
+    "Corvus Drake", "Orion Pax", "Hester Prynn", "Titus Blake", "Zane Cross"
+  ],
+
+  BONUSES: [
+    "None", "None", "None",
+    "500cr for live capture",
+    "20% bonus for target's ship",
+    "1kcr for recovery of stolen data drive",
+    "2kcr if contract completed within 48 hours",
+    "500cr for retrieval of personal logs",
+    "1.5kcr for clean extraction with zero collateral damage",
+    "Priority docking clearance voucher"
+  ],
+
+  ASSOCIATES: [
+    "Unknown", "Unknown",
+    "Lone Operator (No known associates)",
+    "Local Syndicate Gang",
+    "2 Armed Mercenary Bodyguards",
+    "Automated Sentry Drones",
+    "Hacker Cell 'Zero-Day'",
+    "Disgraced Station Security Guard",
+    "Family Relatives in Sector 4",
+    "Rogue Android Companion"
+  ],
+
+  POINTS_OF_COLLECTION: [
+    "Local Station PD",
+    "Anvollapolis PD",
+    "Corporate Hangar B-12",
+    "Sub-level Security Checkpoint",
+    "Orbital Patrol Outpost",
+    "Union Hall Sector 4",
+    "Freeport Docking Bay 9",
+    "Private Shuttle Platform 3",
+    "System Security Office"
+  ],
+
+  LAST_LOCATIONS: [
+    "Sub-level 3 Sector",
+    "MegaYUM Supermarket",
+    "Asteroid Mining Complex 9",
+    "The Rusty Thruster Cantina",
+    "Docking Bay 4",
+    "Deck 12 Residential Blocks",
+    "Decommissioned Mining Vessel 'Gorgon'",
+    "Orbital Transit Hub",
+    "Hydroponics Vault B"
+  ],
+
+  FOOTNOTES: [
+    "", "",
+    "Caution: Target is believed to be armed and extremely dangerous.",
+    "Verify bounty authorization before initiating engagement.",
+    "No collateral damage tolerated in corporate sectors.",
+    "Bounty expires in 14 standard cycles.",
+    "Payment issued upon biometric verification at collection point."
+  ]
 };
+
+/**
+ * Helper to roll a random Client Type and realistic client name
+ */
+async function rollClientData() {
+  let clientType = await rollTableText("Client Type", "WoSTableClientType");
+  if (!clientType) {
+    const idx = Math.floor(Math.random() * WOS_DATA.CLIENT_TYPES.length);
+    clientType = WOS_DATA.CLIENT_TYPES[idx];
+  }
+
+  const clientNames = {
+    Corporate: ["MegaYUM Logistics Corp", "Axiom BioTech", "Sol-Mining Conglomerate", "Dynamic Systems Inc", "Weyland-Yutani Division", "Apex Cybernetics", "OmniCorp Interstellar"],
+    Criminal: ["Anvollapolis Syndicate", "Red Sun Cartel", "Viper Cell", "Black Market Outfit", "Kurosawa Smuggling Ring", "Shadow Network"],
+    Union: ["Sector 4 Dockworkers Union", "Deep Space Miners Guild", "Free Labor Front", "Mechanics & Engineers Guild", "Orbital Freight Local 802"],
+    Civilian: ["Private Citizen", "Doctor Evelyn Vance", "Captain J. Vance", "Family of the Deceased", "Professor H. Aris", "Estate of Marcus Thorne"],
+    Military: ["3rd Orbital Patrol Unit", "Sector 7 High Command", "System Defense Force", "Special Tactical Directorate", "Naval Security Detachment"]
+  };
+
+  const pool = clientNames[clientType] || clientNames.Corporate;
+  const name = pool[Math.floor(Math.random() * pool.length)];
+  return { type: clientType, name: name };
+}
 
 /**
  * Robust helper to get all World Journal Entries (supports game.journal & game.journals)
@@ -304,12 +390,15 @@ function generateCharCode() {
  * Renders the FULL Wages of Sin WANTED Booklet Journal Entry HTML layout
  */
 function renderBountyHTML(data = {}) {
-  const rawTarget = data.target || "Unknown Target";
+  const isUnknown = Boolean(data.isUnknown) || (data.target || "").toUpperCase().includes("UNKNOWN TARGET") || (data.target || "").toUpperCase().includes("UNIDENTIFIED");
+  const rawTarget = isUnknown ? (data.target || "UNKNOWN TARGET") : (data.target || "Unknown Target");
   const targetUuid = data.targetUuid || "";
   
   let targetDisplay = rawTarget;
-  if (targetUuid && !rawTarget.includes("@UUID")) {
+  if (!isUnknown && targetUuid && !rawTarget.includes("@UUID")) {
     targetDisplay = `@UUID[${targetUuid}]{${rawTarget}}`;
+  } else if (isUnknown) {
+    targetDisplay = `<span class="wos-unknown-target-label"><i class="fas fa-user-secret"></i> ${rawTarget.toUpperCase()}</span>`;
   }
 
   const bountyLevel = parseInt(data.bountyLevel) || 1;
@@ -338,9 +427,20 @@ function renderBountyHTML(data = {}) {
     `<span class="wos-circle-option ${status === wantedStatus ? 'wos-active' : ''}">${status}</span>`
   ).join(" ");
 
-  const imgContent = img 
-    ? `<img src="${img}" alt="${rawTarget}" />`
-    : `<div class="wos-bounty-no-img">NO IMAGE AVAILABLE</div>`;
+  let imgContent = "";
+  if (img && !isUnknown) {
+    imgContent = `<img src="${img}" alt="${rawTarget}" />`;
+  } else if (img && isUnknown) {
+    imgContent = `<img src="${img}" alt="${rawTarget}" />`;
+  } else {
+    imgContent = `
+      <div class="wos-bounty-unknown-img">
+        <div class="wos-unknown-icon"><i class="fas fa-user-secret"></i></div>
+        <div class="wos-unknown-badge">IDENTITY UNKNOWN</div>
+        <div class="wos-unknown-subtext">TARGET UNIDENTIFIED</div>
+      </div>
+    `;
+  }
 
   const complicationsHTML = complications.length > 0
     ? `<div class="wos-bounty-section">
@@ -354,10 +454,10 @@ function renderBountyHTML(data = {}) {
     : `<div></div>`;
 
   return `
-<div class="wos-bounty-container wos-bl-${bountyLevel}" data-bounty-data='${JSON.stringify(data).replace(/'/g, "&apos;")}'>
+<div class="wos-bounty-container wos-bl-${bountyLevel} ${isUnknown ? 'wos-is-unknown' : ''}" data-bounty-data="${encodeURIComponent(JSON.stringify(data))}">
   <div class="wos-bounty-header">
     <div class="wos-bounty-header-left">
-      <div class="wos-bounty-badge">BOUNTY</div>
+      <div class="wos-bounty-badge">${isUnknown ? 'UNKNOWN BOUNTY' : 'BOUNTY'}</div>
       <div class="wos-bounty-title">${rawTarget.toUpperCase()}, ${crime.toUpperCase()}</div>
     </div>
     <div class="wos-bounty-header-right">WAGES OF SIN</div>
@@ -435,12 +535,15 @@ function renderBountyHTML(data = {}) {
  * Renders the PLAYER-FACING ONLY Bounty Poster (Omit Warden Info, Consequences, Complications)
  */
 function renderPlayerBountyHTML(data = {}) {
-  const rawTarget = data.target || "Unknown Target";
+  const isUnknown = Boolean(data.isUnknown) || (data.target || "").toUpperCase().includes("UNKNOWN TARGET") || (data.target || "").toUpperCase().includes("UNIDENTIFIED");
+  const rawTarget = isUnknown ? (data.target || "UNKNOWN TARGET") : (data.target || "Unknown Target");
   const targetUuid = data.targetUuid || "";
   
   let targetDisplay = rawTarget;
-  if (targetUuid && !rawTarget.includes("@UUID")) {
+  if (!isUnknown && targetUuid && !rawTarget.includes("@UUID")) {
     targetDisplay = `@UUID[${targetUuid}]{${rawTarget}}`;
+  } else if (isUnknown) {
+    targetDisplay = `<span class="wos-unknown-target-label"><i class="fas fa-user-secret"></i> ${rawTarget.toUpperCase()}</span>`;
   }
 
   const bountyLevel = parseInt(data.bountyLevel) || 1;
@@ -466,19 +569,30 @@ function renderPlayerBountyHTML(data = {}) {
     `<span class="wos-circle-option ${status === wantedStatus ? 'wos-active' : ''}">${status}</span>`
   ).join(" ");
 
-  const imgContent = img 
-    ? `<img src="${img}" alt="${rawTarget}" />`
-    : `<div class="wos-bounty-no-img">NO IMAGE AVAILABLE</div>`;
+  let imgContent = "";
+  if (img && !isUnknown) {
+    imgContent = `<img src="${img}" alt="${rawTarget}" />`;
+  } else if (img && isUnknown) {
+    imgContent = `<img src="${img}" alt="${rawTarget}" />`;
+  } else {
+    imgContent = `
+      <div class="wos-bounty-unknown-img">
+        <div class="wos-unknown-icon"><i class="fas fa-user-secret"></i></div>
+        <div class="wos-unknown-badge">IDENTITY UNKNOWN</div>
+        <div class="wos-unknown-subtext">TARGET UNIDENTIFIED</div>
+      </div>
+    `;
+  }
 
   const footnotesHTML = footnotes
     ? `<div><strong>Footnotes:</strong> ${footnotes}</div>`
     : `<div></div>`;
 
   return `
-<div class="wos-bounty-container wos-bl-${bountyLevel}">
+<div class="wos-bounty-container wos-bl-${bountyLevel} ${isUnknown ? 'wos-is-unknown' : ''}">
   <div class="wos-bounty-header">
     <div class="wos-bounty-header-left">
-      <div class="wos-bounty-badge">PUBLIC BOUNTY</div>
+      <div class="wos-bounty-badge">${isUnknown ? 'UNKNOWN BOUNTY' : 'PUBLIC BOUNTY'}</div>
       <div class="wos-bounty-title">${rawTarget.toUpperCase()}, ${crime.toUpperCase()}</div>
     </div>
     <div class="wos-bounty-header-right">WAGES OF SIN</div>
@@ -596,54 +710,151 @@ function extractBountyDataFromJournal(journal) {
   const page = pages[0];
   const content = page?.text?.content || "";
 
-  const match = content.match(/data-bounty-data='([^']+)'/);
-  if (match) {
+  // 1. Check for URL-encoded JSON in data-bounty-data attribute
+  const matchEncoded = content.match(/data-bounty-data=["']([^"']+)["']/i);
+  if (matchEncoded) {
     try {
-      return JSON.parse(match[1].replace(/&apos;/g, "'"));
-    } catch(e) {}
+      const decodedStr = decodeURIComponent(matchEncoded[1]);
+      return JSON.parse(decodedStr);
+    } catch(e) {
+      try {
+        const decodedLegacy = matchEncoded[1].replace(/&apos;/g, "'");
+        return JSON.parse(decodedLegacy);
+      } catch(err) {}
+    }
   }
 
-  const cleanName = journal.name.replace(/^(bounty|wanted|target)[\s\:\-\_]*/i, "").trim() || journal.name;
-
+  // 2. DOM Parser fallback for legacy or manually authored journal entries
+  let cleanName = journal.name.replace(/^(bounty|wanted|target)[\s\:\-\_]*/i, "").trim() || journal.name;
+  let isUnknown = false;
   let img = "";
-  const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["']/i);
-  if (imgMatch) img = imgMatch[1];
-
   let bountyLevel = 1;
-  const blMatch = content.match(/(?:BL:|Bounty Level:?)\s*(\d+)/i);
-  if (blMatch) bountyLevel = parseInt(blMatch[1]);
-
   let crime = "Unspecified Offense";
-  const crimeMatch = content.match(/Crime:?<\/strong>\s*([^<]+)/i) || content.match(/Crime:?\s*([^\n<]+)/i);
-  if (crimeMatch) crime = crimeMatch[1].trim();
-
   let wantedStatus = "Alive";
-  if (content.includes("Dead or Alive")) wantedStatus = "Dead or Alive";
-  else if (content.includes("Dead")) wantedStatus = "Dead";
-
   let client = "Unknown Client";
-  const clientMatch = content.match(/Client:?<\/strong>\s*([^<]+)/i) || content.match(/Client:?\s*([^\n<]+)/i);
-  if (clientMatch) client = clientMatch[1].trim();
-
   let reward = "Negotiable";
-  const rewardMatch = content.match(/Reward:?<\/strong>\s*([^<]+)/i) || content.match(/Reward:?\s*([^\n<]+)/i);
-  if (rewardMatch) reward = rewardMatch[1].trim();
+  let bonus = "None";
+  let associates = "Unknown";
+  let pointOfCollection = "Local Station PD";
+  let lastLocation = "Local Sector";
+  let advert = "";
+  let briefing = "";
+  let wardenInfo = "";
+  let consequences = "";
+  let complications = [];
+  let footnotes = "";
+  let charCode = generateCharCode();
+
+  try {
+    if (typeof DOMParser !== "undefined") {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(content, "text/html");
+
+      const container = doc.querySelector(".wos-bounty-container");
+      if (container) {
+        const blMatch = container.className.match(/wos-bl-(\d+)/);
+        if (blMatch) bountyLevel = parseInt(blMatch[1]);
+        if (container.classList.contains("wos-is-unknown")) isUnknown = true;
+      }
+
+      const titleEl = doc.querySelector(".wos-bounty-title");
+      if (titleEl) {
+        const parts = titleEl.textContent.split(",");
+        if (parts[0]) cleanName = parts[0].trim();
+      }
+
+      const imgEl = doc.querySelector(".wos-bounty-portrait-frame img");
+      if (imgEl) img = imgEl.getAttribute("src") || "";
+
+      if (doc.querySelector(".wos-bounty-unknown-img") || cleanName.toUpperCase().includes("UNKNOWN")) {
+        isUnknown = true;
+      }
+
+      const wantedEl = doc.querySelector(".wos-bounty-wanted-banner");
+      if (wantedEl) {
+        const txt = wantedEl.textContent;
+        if (txt.includes("DEAD OR ALIVE")) wantedStatus = "Dead or Alive";
+        else if (txt.includes("DEAD")) wantedStatus = "Dead";
+        else if (txt.includes("ALIVE")) wantedStatus = "Alive";
+      }
+
+      const detailPars = doc.querySelectorAll(".wos-bounty-details-list p");
+      detailPars.forEach(p => {
+        const text = p.textContent;
+        if (text.startsWith("Target:")) {
+          const val = text.replace(/^Target:\s*/i, "").trim();
+          if (val) cleanName = val;
+        } else if (text.startsWith("Crime:")) {
+          crime = text.replace(/^Crime:\s*/i, "").trim();
+        } else if (text.startsWith("Client:")) {
+          client = text.replace(/^Client:\s*/i, "").trim();
+        } else if (text.startsWith("Reward:")) {
+          reward = text.replace(/^Reward:\s*/i, "").trim();
+        } else if (text.startsWith("Bonus:")) {
+          bonus = text.replace(/^Bonus:\s*/i, "").trim();
+        } else if (text.startsWith("Known associates:")) {
+          associates = text.replace(/^Known associates:\s*/i, "").trim();
+        }
+      });
+
+      const locPars = doc.querySelectorAll(".wos-bounty-section p");
+      locPars.forEach(p => {
+        const text = p.textContent;
+        if (text.startsWith("Point of Collection:")) {
+          pointOfCollection = text.replace(/^Point of Collection:\s*/i, "").trim();
+        } else if (text.startsWith("Last Known Location:")) {
+          lastLocation = text.replace(/^Last Known Location:\s*/i, "").trim();
+        }
+      });
+
+      const advertEl = doc.querySelector(".wos-bounty-advert-body");
+      if (advertEl) advert = advertEl.textContent.trim().replace(/^["']|["']$/g, "");
+
+      const sections = doc.querySelectorAll(".wos-bounty-section");
+      sections.forEach(sec => {
+        const h3 = sec.querySelector("h3");
+        if (!h3) return;
+        const title = h3.textContent.trim().toLowerCase();
+        const p = sec.querySelector("p");
+        if (title.includes("briefing") && p) briefing = p.innerHTML.replace(/<br\s*\/?>/gi, "\n").trim();
+        else if (title.includes("warden information") && p) wardenInfo = p.innerHTML.replace(/<br\s*\/?>/gi, "\n").trim();
+        else if (title.includes("consequences") && p) consequences = p.innerHTML.replace(/<br\s*\/?>/gi, "\n").trim();
+        else if (title.includes("complications")) {
+          const lis = sec.querySelectorAll("li");
+          complications = Array.from(lis).map(li => li.textContent.trim());
+        }
+      });
+
+      const codeEl = doc.querySelector(".wos-bounty-char-code");
+      if (codeEl) {
+        const codeMatch = codeEl.textContent.match(/\d+/);
+        if (codeMatch) charCode = codeMatch[0];
+      }
+    }
+  } catch(e) {
+    console.warn("Wages of Sin: Error decoding DOM from bounty journal", e);
+  }
 
   return {
     target: cleanName,
+    isUnknown: isUnknown,
     img: img,
     bountyLevel: bountyLevel,
     crime: crime,
     wantedStatus: wantedStatus,
     client: client,
     reward: reward,
-    bonus: "None",
-    associates: "Unknown",
-    pointOfCollection: "Local Station PD",
-    lastLocation: "Local Sector",
-    advert: `Reward offered for apprehension regarding charges of ${crime}.`,
-    briefing: content.replace(/<[^>]+>/g, " ").slice(0, 300).trim() || "No briefing provided.",
-    charCode: generateCharCode()
+    bonus: bonus,
+    associates: associates,
+    pointOfCollection: pointOfCollection,
+    lastLocation: lastLocation,
+    advert: advert || `Reward offered for apprehension regarding charges of ${crime}.`,
+    briefing: briefing || "No briefing provided.",
+    wardenInfo: wardenInfo || "No Warden information recorded.",
+    consequences: consequences || "Standard enforcement protocols apply upon turn-in.",
+    complications: complications,
+    footnotes: footnotes,
+    charCode: charCode
   };
 }
 
@@ -773,6 +984,7 @@ function createBountyForm(initialData = {}) {
   const data = {
     target: initialData.target || "",
     targetUuid: initialData.targetUuid || "",
+    isUnknown: Boolean(initialData.isUnknown),
     bountyLevel: initialData.bountyLevel || 1,
     crime: initialData.crime || "",
     wantedStatus: initialData.wantedStatus || "Alive",
@@ -806,24 +1018,42 @@ function createBountyForm(initialData = {}) {
 
   const formHTML = `
     <form class="wos-bounty-dialog-form wos-bl-theme-${data.bountyLevel}">
+      <div class="wos-reroll-header-bar">
+        <span><i class="fas fa-dice"></i> <strong>Bounty Generator Controls</strong></span>
+        <button type="button" class="wos-reroll-all-btn" title="Re-roll every single field in the form"><i class="fas fa-dice"></i> Re-roll All Fields</button>
+      </div>
+
       <div class="wos-drop-zone wos-target-drop-zone" title="Drag and drop an Actor or Token here">
         <i class="fas fa-user-plus"></i> <span>Drag & Drop Actor/Token here to set <strong>Target & Portrait Image</strong></span>
       </div>
 
       <div class="wos-bounty-form-row">
         <div class="form-group">
-          <label>Target Name:</label>
+          <div class="wos-form-label-row">
+            <label>Target Name:</label>
+            <button type="button" class="wos-reroll-btn" data-reroll="target" title="Re-roll Target Name"><i class="fas fa-dice"></i></button>
+          </div>
           <input type="text" name="target" value="${data.target}" placeholder="e.g. Markos Petraitiene or @UUID[...]" />
           <input type="hidden" name="targetUuid" value="${data.targetUuid}" />
+          <label class="wos-unknown-checkbox-label">
+            <input type="checkbox" name="isUnknown" ${data.isUnknown ? 'checked' : ''} />
+            <span><i class="fas fa-user-secret"></i> Unknown Target / Identity (Hide name/portrait on poster)</span>
+          </label>
         </div>
         <div class="form-group">
-          <label>Target Image (URL/Path):</label>
+          <div class="wos-form-label-row">
+            <label>Target Image (URL/Path):</label>
+            <button type="button" class="wos-reroll-btn" data-reroll="img" title="Clear/Reset Image"><i class="fas fa-dice"></i></button>
+          </div>
           <input type="text" name="img" value="${data.img}" placeholder="path/to/image.png" />
         </div>
       </div>
 
       <div class="form-group">
-        <label><strong>Bounty Level (Click to select BL & Theme Color):</strong></label>
+        <div class="wos-form-label-row">
+          <label><strong>Bounty Level (Click to select BL & Theme Color):</strong></label>
+          <button type="button" class="wos-reroll-btn" data-reroll="bountyLevel" title="Re-roll Bounty Level & Reward"><i class="fas fa-dice"></i></button>
+        </div>
         <div class="wos-bl-selector-grid">
           ${blPillsHTML}
         </div>
@@ -831,7 +1061,10 @@ function createBountyForm(initialData = {}) {
 
       <div class="wos-bounty-form-row">
         <div class="form-group">
-          <label>Wanted Condition:</label>
+          <div class="wos-form-label-row">
+            <label>Wanted Condition:</label>
+            <button type="button" class="wos-reroll-btn" data-reroll="wantedStatus" title="Re-roll Wanted Condition"><i class="fas fa-dice"></i></button>
+          </div>
           <select name="wantedStatus">
             <option value="Alive" ${data.wantedStatus === 'Alive' ? 'selected' : ''}>Alive</option>
             <option value="Dead" ${data.wantedStatus === 'Dead' ? 'selected' : ''}>Dead</option>
@@ -839,35 +1072,53 @@ function createBountyForm(initialData = {}) {
           </select>
         </div>
         <div class="form-group">
-          <label>Crime:</label>
+          <div class="wos-form-label-row">
+            <label>Crime:</label>
+            <button type="button" class="wos-reroll-btn" data-reroll="crime" title="Re-roll Crime"><i class="fas fa-dice"></i></button>
+          </div>
           <input type="text" name="crime" value="${data.crime}" placeholder="e.g. Theft" />
         </div>
       </div>
 
       <div class="wos-bounty-form-row">
         <div class="form-group">
-          <label>Client:</label>
+          <div class="wos-form-label-row">
+            <label>Client:</label>
+            <button type="button" class="wos-reroll-btn" data-reroll="client" title="Re-roll Client"><i class="fas fa-dice"></i></button>
+          </div>
           <input type="text" name="client" value="${data.client}" placeholder="e.g. MegaYUM Supermarket" />
         </div>
         <div class="form-group">
-          <label>Reward:</label>
+          <div class="wos-form-label-row">
+            <label>Reward:</label>
+            <button type="button" class="wos-reroll-btn" data-reroll="reward" title="Re-roll Reward"><i class="fas fa-dice"></i></button>
+          </div>
           <input type="text" name="reward" value="${data.reward}" placeholder="e.g. 2kcr" />
         </div>
       </div>
 
       <div class="wos-bounty-form-row">
         <div class="form-group">
-          <label>Bonus:</label>
+          <div class="wos-form-label-row">
+            <label>Bonus:</label>
+            <button type="button" class="wos-reroll-btn" data-reroll="bonus" title="Re-roll Bonus"><i class="fas fa-dice"></i></button>
+          </div>
           <input type="text" name="bonus" value="${data.bonus}" placeholder="e.g. None or 500cr for recovery" />
         </div>
         <div class="form-group">
-          <label>Char. Code:</label>
+          <div class="wos-form-label-row">
+            <label>Char. Code:</label>
+            <button type="button" class="wos-reroll-btn" data-reroll="charCode" title="Re-roll Char Code"><i class="fas fa-dice"></i></button>
+          </div>
           <input type="text" name="charCode" value="${data.charCode}" />
         </div>
       </div>
 
       <div class="form-group">
-        <label>Known Associates:</label>
+        <div class="wos-form-label-row">
+          <label>Known Associates:</label>
+          <button type="button" class="wos-reroll-btn" data-reroll="associates" title="Re-roll Known Associates"><i class="fas fa-dice"></i></button>
+        </div>
         <div class="wos-drop-zone wos-associates-drop-zone" title="Drag and drop Actors or Tokens here to add hard links">
           <i class="fas fa-users-cog"></i> <span>Drag & Drop Actor(s) here to append <strong>@UUID Hard Links</strong></span>
         </div>
@@ -876,42 +1127,66 @@ function createBountyForm(initialData = {}) {
 
       <div class="wos-bounty-form-row">
         <div class="form-group">
-          <label>Point of Collection:</label>
+          <div class="wos-form-label-row">
+            <label>Point of Collection:</label>
+            <button type="button" class="wos-reroll-btn" data-reroll="pointOfCollection" title="Re-roll Point of Collection"><i class="fas fa-dice"></i></button>
+          </div>
           <input type="text" name="pointOfCollection" value="${data.pointOfCollection}" placeholder="e.g. Anvollapolis PD" />
         </div>
         <div class="form-group">
-          <label>Last Known Location:</label>
+          <div class="wos-form-label-row">
+            <label>Last Known Location:</label>
+            <button type="button" class="wos-reroll-btn" data-reroll="lastLocation" title="Re-roll Last Known Location"><i class="fas fa-dice"></i></button>
+          </div>
           <input type="text" name="lastLocation" value="${data.lastLocation}" placeholder="e.g. MegaYUM Supermarket" />
         </div>
       </div>
 
       <div class="form-group">
-        <label>Advert Text:</label>
+        <div class="wos-form-label-row">
+          <label>Advert Text:</label>
+          <button type="button" class="wos-reroll-btn" data-reroll="advert" title="Generate Advert Text"><i class="fas fa-dice"></i></button>
+        </div>
         <input type="text" name="advert" value="${data.advert}" placeholder="Short public summary" />
       </div>
 
       <div class="form-group">
-        <label>Briefing (Player-Facing Notes):</label>
+        <div class="wos-form-label-row">
+          <label>Briefing (Player-Facing Notes):</label>
+          <button type="button" class="wos-reroll-btn" data-reroll="briefing" title="Generate Briefing"><i class="fas fa-dice"></i></button>
+        </div>
         <textarea name="briefing">${data.briefing}</textarea>
       </div>
 
       <div class="form-group">
-        <label>Warden Information (Full Details):</label>
+        <div class="wos-form-label-row">
+          <label>Warden Information (Full Details):</label>
+          <button type="button" class="wos-reroll-btn" data-reroll="wardenInfo" title="Generate Warden Info"><i class="fas fa-dice"></i></button>
+        </div>
         <textarea name="wardenInfo">${data.wardenInfo}</textarea>
       </div>
 
       <div class="form-group">
-        <label>Consequences:</label>
+        <div class="wos-form-label-row">
+          <label>Consequences:</label>
+          <button type="button" class="wos-reroll-btn" data-reroll="consequences" title="Generate Consequences"><i class="fas fa-dice"></i></button>
+        </div>
         <textarea name="consequences">${data.consequences}</textarea>
       </div>
 
       <div class="form-group">
-        <label>Complications (one per line):</label>
+        <div class="wos-form-label-row">
+          <label>Complications (one per line):</label>
+          <button type="button" class="wos-reroll-btn" data-reroll="complications" title="Re-roll Complications"><i class="fas fa-dice"></i></button>
+        </div>
         <textarea name="complications">${data.complications}</textarea>
       </div>
 
       <div class="form-group">
-        <label>Footnotes:</label>
+        <div class="wos-form-label-row">
+          <label>Footnotes:</label>
+          <button type="button" class="wos-reroll-btn" data-reroll="footnotes" title="Re-roll Footnotes"><i class="fas fa-dice"></i></button>
+        </div>
         <input type="text" name="footnotes" value="${data.footnotes}" />
       </div>
     </form>
@@ -932,10 +1207,12 @@ function createBountyForm(initialData = {}) {
             : [];
 
           const selectedBL = parseInt(html.find('.wos-bl-pill.selected input').val()) || 1;
+          const isUnknown = form.isUnknown ? form.isUnknown.checked : false;
 
           const bountyData = {
-            target: form.target.value.trim() || "Unknown Target",
+            target: form.target.value.trim() || (isUnknown ? "UNKNOWN TARGET" : "Unknown Target"),
             targetUuid: form.targetUuid.value.trim(),
+            isUnknown: isUnknown,
             img: form.img.value.trim(),
             bountyLevel: selectedBL,
             wantedStatus: form.wantedStatus.value,
@@ -967,6 +1244,138 @@ function createBountyForm(initialData = {}) {
     render: (html) => {
       const formEl = html.find("form");
       const pills = html.find('.wos-bl-pill');
+
+      const handleReroll = async (fieldKey) => {
+        const isUnknownChecked = html.find('input[name="isUnknown"]').is(":checked");
+
+        if (fieldKey === "target" || fieldKey === "all") {
+          if (isUnknownChecked) {
+            const idx = Math.floor(Math.random() * 9000) + 1000;
+            html.find('input[name="target"]').val(`Subject #${idx}`);
+            html.find('input[name="targetUuid"]').val("");
+          } else {
+            const idx = Math.floor(Math.random() * WOS_DATA.TARGET_NAMES.length);
+            html.find('input[name="target"]').val(WOS_DATA.TARGET_NAMES[idx]);
+            html.find('input[name="targetUuid"]').val("");
+          }
+        }
+
+        if (fieldKey === "img" || fieldKey === "all") {
+          if (isUnknownChecked) {
+            html.find('input[name="img"]').val("");
+          }
+        }
+
+        if (fieldKey === "bountyLevel" || fieldKey === "all") {
+          const newBL = Math.floor(Math.random() * 9) + 1;
+          const pill = html.find(`.wos-bl-pill[data-bl="${newBL}"]`);
+          pill.trigger("click");
+        }
+
+        if (fieldKey === "wantedStatus" || fieldKey === "all") {
+          const statuses = ["Alive", "Alive", "Dead or Alive", "Dead"];
+          const status = statuses[Math.floor(Math.random() * statuses.length)];
+          html.find('select[name="wantedStatus"]').val(status);
+        }
+
+        if (fieldKey === "crime" || fieldKey === "all") {
+          const crime = await rollCrimeFromTable();
+          html.find('input[name="crime"]').val(crime);
+        }
+
+        if (fieldKey === "client" || fieldKey === "all") {
+          const clientData = await rollClientData();
+          html.find('input[name="client"]').val(clientData.name);
+        }
+
+        if (fieldKey === "reward" || fieldKey === "all") {
+          const currentBL = parseInt(html.find('.wos-bl-pill.selected input').val()) || 1;
+          html.find('input[name="reward"]').val(WOS_DATA.BOUNTY_LEVELS[currentBL].rollReward());
+        }
+
+        if (fieldKey === "bonus" || fieldKey === "all") {
+          const idx = Math.floor(Math.random() * WOS_DATA.BONUSES.length);
+          html.find('input[name="bonus"]').val(WOS_DATA.BONUSES[idx]);
+        }
+
+        if (fieldKey === "charCode" || fieldKey === "all") {
+          html.find('input[name="charCode"]').val(generateCharCode());
+        }
+
+        if (fieldKey === "associates" || fieldKey === "all") {
+          const idx = Math.floor(Math.random() * WOS_DATA.ASSOCIATES.length);
+          html.find('textarea[name="associates"]').val(WOS_DATA.ASSOCIATES[idx]);
+        }
+
+        if (fieldKey === "pointOfCollection" || fieldKey === "all") {
+          const idx = Math.floor(Math.random() * WOS_DATA.POINTS_OF_COLLECTION.length);
+          html.find('input[name="pointOfCollection"]').val(WOS_DATA.POINTS_OF_COLLECTION[idx]);
+        }
+
+        if (fieldKey === "lastLocation" || fieldKey === "all") {
+          const idx = Math.floor(Math.random() * WOS_DATA.LAST_LOCATIONS.length);
+          html.find('input[name="lastLocation"]').val(WOS_DATA.LAST_LOCATIONS[idx]);
+        }
+
+        if (fieldKey === "complications" || fieldKey === "all") {
+          const compCount = Math.floor(Math.random() * 4) + 1;
+          const comps = await rollComplicationsFromTable(compCount);
+          html.find('textarea[name="complications"]').val(comps.join("\n• "));
+        }
+
+        if (fieldKey === "footnotes" || fieldKey === "all") {
+          const idx = Math.floor(Math.random() * WOS_DATA.FOOTNOTES.length);
+          html.find('input[name="footnotes"]').val(WOS_DATA.FOOTNOTES[idx]);
+        }
+
+        const targetVal = html.find('input[name="target"]').val().trim() || (isUnknownChecked ? "UNKNOWN TARGET" : "Unknown Target");
+        const crimeVal = html.find('input[name="crime"]').val().trim() || "Unspecified Offense";
+        const clientVal = html.find('input[name="client"]').val().trim() || "Unknown Client";
+        const blVal = parseInt(html.find('.wos-bl-pill.selected input').val()) || 1;
+        const blInfo = WOS_DATA.BOUNTY_LEVELS[blVal];
+        const locVal = html.find('input[name="lastLocation"]').val().trim() || "Local Sector";
+        const compsVal = html.find('textarea[name="complications"]').val().trim();
+        const compList = compsVal ? compsVal.split("\n").map(s => s.replace(/^[\s•\-\*]+/, "").trim()).filter(Boolean) : [];
+
+        if (fieldKey === "advert" || fieldKey === "all") {
+          html.find('input[name="advert"]').val(`A bounty has been issued by ${clientVal} for the apprehension of ${targetVal} regarding charges of ${crimeVal}.`);
+        }
+
+        if (fieldKey === "briefing" || fieldKey === "all") {
+          html.find('textarea[name="briefing"]').val(`Target ${targetVal} is wanted by ${clientVal} for ${crimeVal}. Rated Bounty Level ${blVal} (${blInfo.name}). ${blInfo.desc}`);
+        }
+
+        if (fieldKey === "wardenInfo" || fieldKey === "all") {
+          let wardenTxt = `Investigation indicates target was active recently in ${locVal}.`;
+          if (compList.length > 0) {
+            wardenTxt += ` Complications include:\n• ` + compList.join("\n• ");
+          }
+          html.find('textarea[name="wardenInfo"]').val(wardenTxt);
+        }
+
+        if (fieldKey === "consequences" || fieldKey === "all") {
+          html.find('textarea[name="consequences"]').val(`Apprehension resolves outstanding contract with ${clientVal}. Standard enforcement protocols apply upon turn-in.`);
+        }
+      };
+
+      html.find('.wos-reroll-btn').on("click", (ev) => {
+        ev.preventDefault();
+        const field = $(ev.currentTarget).data("reroll");
+        handleReroll(field);
+      });
+
+      html.find('.wos-reroll-all-btn').on("click", (ev) => {
+        ev.preventDefault();
+        handleReroll("all");
+      });
+
+      html.find('input[name="isUnknown"]').on("change", (ev) => {
+        const checked = ev.target.checked;
+        const targetInput = html.find('input[name="target"]');
+        if (checked && (!targetInput.val() || targetInput.val() === "Unknown Target" || targetInput.val() === "Generated Target")) {
+          targetInput.val("UNKNOWN TARGET");
+        }
+      });
 
       pills.on("click", (ev) => {
         pills.removeClass("selected");
@@ -1097,15 +1506,10 @@ async function generateBounty(options = {}) {
   }
   const levelInfo = WOS_DATA.BOUNTY_LEVELS[level];
 
-  let clientType = await rollTableText("Client Type", "WoSTableClientType");
-  if (!clientType) {
-    const clientTypeIdx = Math.floor(Math.random() * WOS_DATA.CLIENT_TYPES.length);
-    clientType = WOS_DATA.CLIENT_TYPES[clientTypeIdx];
-  }
-
+  const clientData = await rollClientData();
   const crime = await rollCrimeFromTable();
 
-  const compCount = Math.floor(Math.random() * 5) + 1;
+  const compCount = Math.floor(Math.random() * 4) + 1;
   const complications = await rollComplicationsFromTable(compCount);
 
   const wantedStatuses = ["Alive", "Alive", "Dead or Alive", "Dead"];
@@ -1113,29 +1517,35 @@ async function generateBounty(options = {}) {
 
   const reward = levelInfo.rollReward();
 
-  let clientName = `${clientType} Org`;
-  if (clientType === "Corporate") clientName = "MegaYUM Logistics Corp";
-  else if (clientType === "Criminal") clientName = "Anvollapolis Syndicate";
-  else if (clientType === "Union") clientName = "Sector 4 Dockworkers Union";
-  else if (clientType === "Civilian") clientName = "Private Citizen";
-  else if (clientType === "Military") clientName = "3rd Orbital Patrol Unit";
+  const isUnknown = options.isUnknown ?? (Math.random() < 0.25);
+  let targetName = isUnknown 
+    ? (Math.random() < 0.5 ? `Subject #${Math.floor(Math.random() * 9000) + 1000}` : "UNKNOWN TARGET")
+    : WOS_DATA.TARGET_NAMES[Math.floor(Math.random() * WOS_DATA.TARGET_NAMES.length)];
+
+  const bonus = WOS_DATA.BONUSES[Math.floor(Math.random() * WOS_DATA.BONUSES.length)];
+  const associates = WOS_DATA.ASSOCIATES[Math.floor(Math.random() * WOS_DATA.ASSOCIATES.length)];
+  const pointOfCollection = WOS_DATA.POINTS_OF_COLLECTION[Math.floor(Math.random() * WOS_DATA.POINTS_OF_COLLECTION.length)];
+  const lastLocation = WOS_DATA.LAST_LOCATIONS[Math.floor(Math.random() * WOS_DATA.LAST_LOCATIONS.length)];
+  const footnotes = WOS_DATA.FOOTNOTES[Math.floor(Math.random() * WOS_DATA.FOOTNOTES.length)];
 
   const initialData = {
-    target: "Generated Target",
+    target: targetName,
+    isUnknown: isUnknown,
     bountyLevel: level,
     crime: crime,
     wantedStatus: wantedStatus,
-    client: clientName,
+    client: clientData.name,
     reward: reward,
-    bonus: "None",
-    associates: "Unknown",
-    pointOfCollection: "Local Station PD",
-    lastLocation: "Sub-level 3 Sector",
-    advert: `Reward offered for apprehension regarding charges of ${crime}.`,
-    briefing: `Target is wanted by ${clientName} for ${crime}. Level ${level} (${levelInfo.name}). ${levelInfo.desc}`,
-    wardenInfo: `Investigation indicates target was active recently in local sector. Complications include:\n• ` + complications.join("\n• "),
-    consequences: `Apprehension resolves outstanding contract with ${clientName}.`,
+    bonus: bonus,
+    associates: associates,
+    pointOfCollection: pointOfCollection,
+    lastLocation: lastLocation,
+    advert: `A bounty has been issued by ${clientData.name} for the apprehension of ${targetName} regarding charges of ${crime}.`,
+    briefing: `Target ${targetName} is wanted by ${clientData.name} for ${crime}. Rated Bounty Level ${level} (${levelInfo.name}). ${levelInfo.desc}`,
+    wardenInfo: `Investigation indicates target was active recently in ${lastLocation}. Complications include:\n• ` + complications.join("\n• "),
+    consequences: `Apprehension resolves outstanding contract with ${clientData.name}. Standard enforcement protocols apply upon turn-in.`,
     complications: complications,
+    footnotes: footnotes,
     charCode: generateCharCode()
   };
 
