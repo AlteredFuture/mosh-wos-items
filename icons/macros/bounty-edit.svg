@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="64" fill="#111116"/>
+  <rect x="70" y="50" width="310" height="392" rx="16" fill="#fdfdfd" stroke="#e5b700" stroke-width="12"/>
+  <rect x="100" y="85" width="250" height="36" fill="#e5b700"/>
+  <text x="225" y="110" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#111" text-anchor="middle">EDIT BOUNTY</text>
+  <rect x="130" y="145" width="190" height="130" fill="#222" stroke="#111" stroke-width="4"/>
+  <circle cx="225" cy="195" r="30" fill="#e5b700"/>
+  <path d="M 180 255 C 180 225, 270 225, 270 255 Z" fill="#e5b700"/>
+  <line x1="110" y1="305" x2="335" y2="305" stroke="#111" stroke-width="8" stroke-linecap="round"/>
+  <line x1="110" y1="335" x2="290" y2="335" stroke="#111" stroke-width="8" stroke-linecap="round"/>
+  <line x1="110" y1="365" x2="250" y2="365" stroke="#111" stroke-width="8" stroke-linecap="round"/>
+  <!-- Pencil Icon -->
+  <g transform="translate(240, 220) rotate(-35)">
+    <rect x="0" y="0" width="60" height="220" rx="10" fill="#e5b700" stroke="#111" stroke-width="8"/>
+    <polygon points="0,220 30,280 60,220" fill="#111"/>
+    <polygon points="15,250 30,280 45,250" fill="#fdfdfd"/>
+    <rect x="0" y="0" width="60" height="40" fill="#d84315"/>
+  </g>
+</svg>

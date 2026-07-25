@@ -1798,7 +1798,78 @@ async function generateBounty(options = {}) {
 }
 
 /**
- * Ensures all 3 Wages of Sin Macros exist in game.macros sidebar directory for instant GM access
+ * Interactive Dialog to select an existing world bounty and edit it in the Bounty Form
+ */
+async function editBountySelectDialog() {
+  if (!game.user?.isGM) return;
+
+  const allJournals = getWorldJournals();
+  
+  // Filter for single Bounty Journal Entries (exclude Bounty Boards)
+  const bountyJournals = allJournals.filter(j => {
+    const pages = j.pages?.contents || Array.from(j.pages || []);
+    const content = pages[0]?.text?.content || "";
+    return content.includes("wos-bounty-container") && !content.includes("wos-bounty-board-container");
+  });
+
+  if (bountyJournals.length === 0) {
+    ui.notifications?.warn("No single Bounty Journal Entries found in your world. Create a bounty first!");
+    return;
+  }
+
+  const optionsHTML = bountyJournals.map(j => {
+    const data = extractBountyDataFromJournal(j);
+    const cleanTargetName = data.target ? data.target.replace(/@UUID\[[^\]]+\]\{([^}]+)\}/, "$1") : j.name;
+    const statusUpper = (data.status || "open").toUpperCase();
+    const bl = data.bountyLevel || 1;
+    return `
+      <option value="${j.id}">
+        ${cleanTargetName} (BL:${bl} | Status: ${statusUpper}) — ${j.name}
+      </option>
+    `;
+  }).join("");
+
+  const dialogHTML = `
+    <form class="wos-edit-select-form">
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label style="margin-bottom: 6px; display: block;"><strong>Select Bounty Journal to Edit:</strong></label>
+        <select name="selectedJournalId" style="width: 100%; padding: 6px; font-size: 0.95rem;">
+          ${optionsHTML}
+        </select>
+      </div>
+      <p style="font-size: 0.85rem; color: #666; margin-top: 4px;">
+        <em>Selected bounty will open in the interactive editor form. Saving automatically syncs all linked Bounty Boards and Player Views.</em>
+      </p>
+    </form>
+  `;
+
+  new Dialog({
+    title: "Wages of Sin — Select Bounty to Edit",
+    content: dialogHTML,
+    buttons: {
+      edit: {
+        icon: '<i class="fas fa-edit"></i>',
+        label: "Edit Selected Bounty",
+        callback: (html) => {
+          const selectedId = html.find('select[name="selectedJournalId"]').val();
+          const targetJournal = getJournalById(selectedId);
+          if (targetJournal) {
+            const data = extractBountyDataFromJournal(targetJournal);
+            createBountyForm(data, targetJournal);
+          }
+        }
+      },
+      cancel: {
+        icon: '<i class="fas fa-times"></i>',
+        label: "Cancel"
+      }
+    },
+    default: "edit"
+  }).render(true);
+}
+
+/**
+ * Ensures all Wages of Sin Macros exist in game.macros sidebar directory for instant GM access
  */
 async function ensureWorldMacros() {
   if (!game.user?.isGM) return;
@@ -1814,6 +1885,11 @@ async function ensureWorldMacros() {
       name: "Wages of Sin: Generate Bounty",
       img: "modules/mosh-wos-items/icons/macros/bounty-generate.svg",
       command: 'if (game.wos?.generateBounty) { game.wos.generateBounty(); } else { ui.notifications.error("Wages of Sin script not ready."); }'
+    },
+    {
+      name: "Wages of Sin: Edit Bounty",
+      img: "modules/mosh-wos-items/icons/macros/bounty-edit.svg",
+      command: 'if (game.wos?.editBountySelectDialog) { game.wos.editBountySelectDialog(); } else { ui.notifications.error("Wages of Sin script not ready."); }'
     },
     {
       name: "Wages of Sin: Create Bounty Board",
@@ -2173,6 +2249,7 @@ Hooks.once("ready", async () => {
   game.wos.showBountyToPlayers = showBountyToPlayers;
   game.wos.renderPlayerBountyPopup = renderPlayerBountyPopup;
   game.wos.upgradeAllBounties = upgradeAllBounties;
+  game.wos.editBountySelectDialog = editBountySelectDialog;
 
   if (game.socket) {
     game.socket.on("module.mosh-wos-items", (payload) => {
