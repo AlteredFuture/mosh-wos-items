@@ -1496,8 +1496,7 @@ function createBountyForm(initialData = {}, editingJournal = null) {
 
         if (fieldKey === "target" || fieldKey === "all") {
           if (isUnknownChecked) {
-            const idx = Math.floor(Math.random() * 9000) + 1000;
-            html.find('input[name="target"]').val(`Subject #${idx}`);
+            html.find('input[name="target"]').val("UNKNOWN TARGET");
             html.find('input[name="targetUuid"]').val("");
           } else {
             const idx = Math.floor(Math.random() * WOS_DATA.TARGET_NAMES.length);
@@ -1765,7 +1764,7 @@ async function generateBounty(options = {}) {
 
   const isUnknown = options.isUnknown ?? (Math.random() < 0.25);
   let targetName = isUnknown 
-    ? (Math.random() < 0.5 ? `Subject #${Math.floor(Math.random() * 9000) + 1000}` : "UNKNOWN TARGET")
+    ? "UNKNOWN TARGET"
     : WOS_DATA.TARGET_NAMES[Math.floor(Math.random() * WOS_DATA.TARGET_NAMES.length)];
 
   const bonus = WOS_DATA.BONUSES[Math.floor(Math.random() * WOS_DATA.BONUSES.length)];
