@@ -465,7 +465,7 @@ function renderBountyHTML(data = {}) {
   <div class="wos-bounty-header">
     <div class="wos-bounty-header-left">
       <div class="wos-bounty-badge">${isUnknown ? 'UNKNOWN BOUNTY' : 'BOUNTY'}</div>
-      <div class="wos-bounty-title">${rawTarget.toUpperCase()}, ${crime.toUpperCase()}</div>
+      <h2 class="wos-bounty-title" id="bounty-${charCode}">${rawTarget.toUpperCase()}, ${crime.toUpperCase()}</h2>
     </div>
     <div class="wos-bounty-header-right">WAGES OF SIN</div>
   </div>
@@ -607,7 +607,7 @@ function renderPlayerBountyHTML(data = {}) {
   <div class="wos-bounty-header">
     <div class="wos-bounty-header-left">
       <div class="wos-bounty-badge">${isUnknown ? 'UNKNOWN BOUNTY' : 'PUBLIC BOUNTY'}</div>
-      <div class="wos-bounty-title">${rawTarget.toUpperCase()}, ${crime.toUpperCase()}</div>
+      <h2 class="wos-bounty-title" id="bounty-${charCode}">${rawTarget.toUpperCase()}, ${crime.toUpperCase()}</h2>
     </div>
     <div class="wos-bounty-header-right">WAGES OF SIN</div>
   </div>
@@ -681,7 +681,7 @@ function renderBountyBoardHTML(bountiesList = [], boardTitle = "Bounty Board") {
 
   return `
 <div class="wos-bounty-board-container">
-  <div class="wos-bounty-board-title">📋 ${boardTitle.toUpperCase()}</div>
+  <h1 class="wos-bounty-board-title">📋 ${boardTitle.toUpperCase()}</h1>
   <div class="wos-bounty-board-grid">
     ${cardsHTML}
   </div>
@@ -1820,6 +1820,11 @@ async function ensureWorldMacros() {
       name: "Wages of Sin: Create Bounty Board",
       img: "icons/svg/clipboard.svg",
       command: 'if (game.wos?.createBountyBoard) { game.wos.createBountyBoard(); } else { ui.notifications.error("Wages of Sin script not ready."); }'
+    },
+    {
+      name: "Wages of Sin: Upgrade & Sync All Bounties",
+      img: "icons/svg/update.svg",
+      command: 'if (game.wos?.upgradeAllBounties) { game.wos.upgradeAllBounties(); } else { ui.notifications.error("Wages of Sin script not ready."); }'
     }
   ];
 
@@ -1837,6 +1842,86 @@ async function ensureWorldMacros() {
       } catch(e) {}
     }
   }
+}
+
+/**
+ * Migration & Upgrade Utility: Upgrades all legacy world Bounty Journal Entries and Bounty Boards
+ * to ensure 100% compatibility with Source of Truth, TOC Navigation, and Auto-Sync features.
+ */
+async function upgradeAllBounties() {
+  if (!game.user?.isGM) return;
+
+  ui.notifications?.info("Upgrading all world Bounty Journal Entries and Bounty Boards...");
+  const allJournals = getWorldJournals();
+  let upgradedBounties = 0;
+  let upgradedBoards = 0;
+
+  for (const journal of allJournals) {
+    const pages = journal.pages?.contents || Array.from(journal.pages || []);
+    const page = pages[0];
+    if (!page) continue;
+
+    const content = page.text?.content || "";
+
+    // 1. Single Bounty Journal Entry
+    if (content.includes("wos-bounty-container") && !content.includes("wos-bounty-board-container")) {
+      const bountyData = extractBountyDataFromJournal(journal);
+      bountyData.sourceJournalId = journal.id;
+      const isPlayerView = journal.name.startsWith("[Player View]");
+      const newHTML = isPlayerView ? renderPlayerBountyHTML(bountyData) : renderBountyHTML(bountyData);
+
+      await page.update({ "text.content": newHTML });
+      upgradedBounties++;
+      
+      await syncLinkedBounties(journal.id, bountyData);
+    }
+
+    // 2. Bounty Board Journal Entry
+    if (content.includes("wos-bounty-board-container")) {
+      if (typeof DOMParser !== "undefined") {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(content, "text/html");
+        const cards = doc.querySelectorAll(".wos-bounty-board-card");
+        let boardChanged = false;
+
+        cards.forEach(card => {
+          const bContainer = card.querySelector(".wos-bounty-container");
+          if (bContainer) {
+            const rawData = bContainer.getAttribute("data-bounty-data");
+            let cardData = {};
+            if (rawData) {
+              try { cardData = JSON.parse(decodeURIComponent(rawData)); } catch(e) {
+                try { cardData = JSON.parse(rawData.replace(/&apos;/g, "'")); } catch(err) {}
+              }
+            }
+            const cardSourceId = card.getAttribute("data-source-journal-id") || bContainer.getAttribute("data-source-journal-id") || cardData.sourceJournalId || "";
+            if (cardSourceId) {
+              const sourceJournal = getJournalById(cardSourceId);
+              if (sourceJournal) {
+                const freshSourceData = extractBountyDataFromJournal(sourceJournal);
+                freshSourceData.sourceJournalId = cardSourceId;
+                card.setAttribute("data-source-journal-id", cardSourceId);
+                card.setAttribute("data-char-code", freshSourceData.charCode || "");
+                card.innerHTML = renderPlayerBountyHTML(freshSourceData);
+                boardChanged = true;
+              }
+            } else {
+              const freshCardHTML = renderPlayerBountyHTML(cardData);
+              card.innerHTML = freshCardHTML;
+              boardChanged = true;
+            }
+          }
+        });
+
+        if (boardChanged) {
+          await page.update({ "text.content": doc.body.innerHTML });
+          upgradedBoards++;
+        }
+      }
+    }
+  }
+
+  ui.notifications?.info(`Upgrade complete! Updated ${upgradedBounties} Bounty Journal Entry(ies) and ${upgradedBoards} Bounty Board(s).`);
 }
 
 // Interactive Bounty Level, Status & Player View Sharing directly on Journal Sheets
@@ -2083,6 +2168,7 @@ Hooks.once("ready", async () => {
   game.wos.publishPlayerBountyJournal = publishPlayerBountyJournal;
   game.wos.showBountyToPlayers = showBountyToPlayers;
   game.wos.renderPlayerBountyPopup = renderPlayerBountyPopup;
+  game.wos.upgradeAllBounties = upgradeAllBounties;
 
   if (game.socket) {
     game.socket.on("module.mosh-wos-items", (payload) => {

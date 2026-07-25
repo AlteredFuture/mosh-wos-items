@@ -55,11 +55,18 @@
   transition: background-color 0.3s ease;
 }
 
+h2.wos-bounty-title,
 .wos-bounty-title {
   font-size: 1.5rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  line-height: 1.2;
 }
 
 .wos-bounty-header-right {
@@ -415,6 +422,7 @@
   box-sizing: border-box;
 }
 
+h1.wos-bounty-board-title,
 .wos-bounty-board-title {
   font-size: 2rem;
   font-weight: 900;
@@ -423,8 +431,9 @@
   text-align: center;
   border-bottom: 3px double #e5b700;
   padding-bottom: 12px;
-  margin-bottom: 24px;
+  margin: 0 0 24px 0;
   color: #e5b700;
+  background: none;
 }
 
 .wos-bounty-board-grid {
