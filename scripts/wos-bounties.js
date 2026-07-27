@@ -2259,16 +2259,34 @@ Hooks.once("ready", async () => {
     });
   }
 
+  // Disable Automated Animations when chat message content/flavor indicates a weapon reload
+  Hooks.on("preCreateChatMessage", (doc) => {
+    const content = doc.content || "";
+    const flavor = doc.flavor || "";
+    const fullText = `${content} ${flavor}`.toLowerCase();
+
+    if (fullText.includes("weapon reloaded")) {
+      doc.updateSource({
+        "flags.autoanimations": {
+          killAnim: true,
+          isExcluded: true
+        }
+      });
+    }
+  });
+
   if (game.modules.get("autoanimations")?.active) {
-    Hooks.on("aa.preAnimationStart", (data) => {
-      const content = data?.message?.content || data?.chatMessage?.content || "";
-      const flavor = data?.message?.flavor || data?.chatMessage?.flavor || "";
-      const itemName = data?.item?.name || "";
-
-      const fullText = `${content} ${flavor} ${itemName}`.toLowerCase();
-
-      if (fullText.includes("weapon reloaded")) {
-        return false;
+    Hooks.on("aa.preAnimationStart", (...args) => {
+      for (const arg of args) {
+        if (!arg) continue;
+        try {
+          const text = JSON.stringify(arg).toLowerCase();
+          if (text.includes("weapon reloaded")) {
+            return false;
+          }
+        } catch (e) {
+          // Ignore circular reference errors during stringify
+        }
       }
     });
     console.log("Mothership: Wages of Sin — Automated Animations reload filter registered.");
