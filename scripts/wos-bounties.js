@@ -2259,51 +2259,14 @@ Hooks.once("ready", async () => {
     });
   }
 
-  // Disable Automated Animations when chat message content/flavor indicates a weapon reload
-  Hooks.on("preCreateChatMessage", (doc) => {
-    const content = doc.content || "";
-    const flavor = doc.flavor || "";
-    const fullText = `${content} ${flavor}`.toLowerCase();
-
-    if (fullText.includes("weapon reloaded")) {
-      doc.updateSource({
-        "flags.autoanimations": {
-          isEnabled: false,
-          killAnim: true,
-          isExcluded: true
-        }
-      });
-    }
-  });
-
+  // Disable Automated Animations specifically for single reload instances
   if (game.modules.get("autoanimations")?.active) {
-    // Hook 1: Runs before AA sanitizes animation data. Cancels animation compilation.
-    Hooks.on("aa.preDataSanitize", (handler, animationData) => {
-      const content = handler?.workflow?.content || handler?.workflow?.flavor || "";
-      const itemName = handler?.itemName || handler?.item?.name || "";
-      const fullText = `${content} ${itemName}`.toLowerCase();
-
-      if (fullText.includes("weapon reloaded")) {
-        if (animationData) {
-          animationData.isEnabled = false;
-          animationData.menu = false;
-          animationData.killAnim = true;
-        }
-        if (handler?.animationData) {
-          handler.animationData.isEnabled = false;
-          handler.animationData.menu = false;
-          handler.animationData.killAnim = true;
-        }
-        handler._isReloading = true;
-      }
-    });
-
-    // Hook 2: Runs right before animation sequence starts. Blank out primary/secondary/FX.
     Hooks.on("aa.preAnimationStart", (sanitizedData) => {
       if (!sanitizedData) return;
       try {
+        // Inspect only this transient animation instance (does not mutate item flags or cache)
         const text = JSON.stringify(sanitizedData).toLowerCase();
-        if (text.includes("weapon reloaded") || sanitizedData._isReloading) {
+        if (text.includes("weapon reloaded")) {
           sanitizedData.primary = false;
           sanitizedData.secondary = false;
           sanitizedData.sourceFX = false;
