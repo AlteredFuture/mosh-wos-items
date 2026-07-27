@@ -2259,7 +2259,23 @@ Hooks.once("ready", async () => {
     });
   }
 
+  if (game.modules.get("autoanimations")?.active) {
+    Hooks.on("aa.preAnimationStart", (data) => {
+      const content = data?.message?.content || data?.chatMessage?.content || "";
+      const flavor = data?.message?.flavor || data?.chatMessage?.flavor || "";
+      const itemName = data?.item?.name || "";
+
+      const fullText = `${content} ${flavor} ${itemName}`.toLowerCase();
+
+      if (fullText.includes("weapon reloaded")) {
+        return false;
+      }
+    });
+    console.log("Mothership: Wages of Sin — Automated Animations reload filter registered.");
+  }
+
   await ensureWorldMacros();
   console.log("Mothership: Wages of Sin — Bounty Generator & Board initialized.");
 });
+
 
