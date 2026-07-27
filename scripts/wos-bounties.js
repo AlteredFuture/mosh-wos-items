@@ -2261,20 +2261,19 @@ Hooks.once("ready", async () => {
 
   // Disable Automated Animations specifically for single reload instances
   if (game.modules.get("autoanimations")?.active) {
-    Hooks.on("aa.preAnimationStart", (sanitizedData) => {
-      if (!sanitizedData) return;
-      try {
-        // Inspect only this transient animation instance (does not mutate item flags or cache)
-        const text = JSON.stringify(sanitizedData).toLowerCase();
-        if (text.includes("weapon reloaded")) {
-          sanitizedData.primary = false;
-          sanitizedData.secondary = false;
-          sanitizedData.sourceFX = false;
-          sanitizedData.targetFX = false;
-          sanitizedData.macro = false;
-        }
-      } catch (e) {
-        // Ignore circular errors
+    Hooks.on("aa.preDataSanitize", (handler, data2) => {
+      if (!handler || !data2) return;
+
+      const content = handler.workflow?.content || "";
+      const flavor = handler.workflow?.flavor || "";
+      const action = handler.action || "";
+      const fullText = `${content} ${flavor} ${action}`.toLowerCase();
+
+      // If the current workflow/chat card contains "reload" or "reloaded"
+      if (fullText.includes("reload")) {
+        // Mutate ONLY the deepCloned data2 object created for this single invocation
+        data2.menu = false;
+        data2.isEnabled = false;
       }
     });
 
