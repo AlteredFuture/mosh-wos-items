@@ -2268,6 +2268,7 @@ Hooks.once("ready", async () => {
     if (fullText.includes("weapon reloaded")) {
       doc.updateSource({
         "flags.autoanimations": {
+          isEnabled: false,
           killAnim: true,
           isExcluded: true
         }
@@ -2276,19 +2277,44 @@ Hooks.once("ready", async () => {
   });
 
   if (game.modules.get("autoanimations")?.active) {
-    Hooks.on("aa.preAnimationStart", (...args) => {
-      for (const arg of args) {
-        if (!arg) continue;
-        try {
-          const text = JSON.stringify(arg).toLowerCase();
-          if (text.includes("weapon reloaded")) {
-            return false;
-          }
-        } catch (e) {
-          // Ignore circular reference errors during stringify
+    // Hook 1: Runs before AA sanitizes animation data. Cancels animation compilation.
+    Hooks.on("aa.preDataSanitize", (handler, animationData) => {
+      const content = handler?.workflow?.content || handler?.workflow?.flavor || "";
+      const itemName = handler?.itemName || handler?.item?.name || "";
+      const fullText = `${content} ${itemName}`.toLowerCase();
+
+      if (fullText.includes("weapon reloaded")) {
+        if (animationData) {
+          animationData.isEnabled = false;
+          animationData.menu = false;
+          animationData.killAnim = true;
         }
+        if (handler?.animationData) {
+          handler.animationData.isEnabled = false;
+          handler.animationData.menu = false;
+          handler.animationData.killAnim = true;
+        }
+        handler._isReloading = true;
       }
     });
+
+    // Hook 2: Runs right before animation sequence starts. Blank out primary/secondary/FX.
+    Hooks.on("aa.preAnimationStart", (sanitizedData) => {
+      if (!sanitizedData) return;
+      try {
+        const text = JSON.stringify(sanitizedData).toLowerCase();
+        if (text.includes("weapon reloaded") || sanitizedData._isReloading) {
+          sanitizedData.primary = false;
+          sanitizedData.secondary = false;
+          sanitizedData.sourceFX = false;
+          sanitizedData.targetFX = false;
+          sanitizedData.macro = false;
+        }
+      } catch (e) {
+        // Ignore circular errors
+      }
+    });
+
     console.log("Mothership: Wages of Sin — Automated Animations reload filter registered.");
   }
 
